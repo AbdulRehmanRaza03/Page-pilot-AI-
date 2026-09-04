@@ -1,16 +1,5 @@
 <p align="center">
-  <a href="https://github.com/AbdulRehmanRaza03/Page-pilot-AI-">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/PagePilot-4F46E5?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0xMiAyTDQgN3YxMGw4IDUgOC01Vjd6Ii8+PC9zdmc+&logoColor=white">
-      <img src="https://img.shields.io/badge/PagePilot-4F46E5?style=for-the-badge" alt="PagePilot" />
-    </picture>
-  </a>
-</p>
-
-<h1 align="center">PagePilot</h1>
-
-<p align="center">
-  <strong>AI-powered Facebook Page communication, lead management &amp; automation platform</strong>
+  <img src="assets/pagepilot-logo.png" alt="PagePilot — AI-powered Facebook Page automation" width="800" style="max-width: 100%;" />
 </p>
 
 <p align="center">
