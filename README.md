@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/pagepilot-logo.png" alt="PagePilot — AI-powered Facebook Page automation" width="800" style="max-width: 100%;" />
+  <img src="assets/pagepilot-logo.png" alt="PagePilot" width="380" />
 </p>
 
 <p align="center">
