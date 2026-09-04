@@ -44,8 +44,12 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_model: str = ""
 
-    # CORS
-    cors_origins: list[str] = ["http://localhost:3000"]
+    # CORS — comma-separated string in env, split into a list.
+    cors_origins: str = "http://localhost:3000"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
 
 settings = Settings()
