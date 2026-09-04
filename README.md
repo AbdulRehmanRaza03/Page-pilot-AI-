@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/pagepilot-logo.png" alt="PagePilot" width="680" height="220" />
+  <img src="assets/pagepilot-banner.png" alt="PagePilot" width="100%" />
 </p>
 
 <p align="center">
