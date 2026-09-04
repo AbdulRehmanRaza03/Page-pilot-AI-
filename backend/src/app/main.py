@@ -35,9 +35,10 @@ def create_app() -> FastAPI:
         # TODO: check DB + Redis connectivity once wired up.
         return {"status": "ready"}
 
-    # Routers are mounted here as modules are built out in later phases.
-    # from app.modules.auth.router import router as auth_router
-    # app.include_router(auth_router, prefix=f"{settings.api_prefix}/auth", tags=["auth"])
+    # Routers
+    from app.modules.auth.router import router as auth_router
+
+    app.include_router(auth_router, prefix=f"{settings.api_prefix}/auth", tags=["auth"])
 
     return app
 
