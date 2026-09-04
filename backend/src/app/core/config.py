@@ -21,8 +21,10 @@ class Settings(BaseSettings):
     # Envelope encryption master key (base64-encoded 32-byte key) for Meta tokens
     encryption_key: str = ""
 
-    # Database
-    database_url: str = "postgresql+asyncpg://pagepilot:pagepilot@localhost:5432/pagepilot"
+    # Database — set DATABASE_URL to a real Postgres/Supabase URL for production.
+    # For a local, no-install demo you may use SQLite:
+    #   DATABASE_URL=sqlite+aiosqlite:///./pagepilot.db
+    database_url: str = "sqlite+aiosqlite:///./pagepilot.db"
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"

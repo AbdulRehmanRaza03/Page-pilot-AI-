@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -9,10 +11,22 @@ from app.core.errors import AppError
 from app.core.logging import setup_logging
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Local demo convenience: auto-create tables for SQLite.
+    # Production uses Alembic migrations against PostgreSQL.
+    if settings.database_url.startswith("sqlite"):
+        from app.core.db import Base, engine
+
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    yield
+
+
 def create_app() -> FastAPI:
     setup_logging()
 
-    app = FastAPI(title=settings.app_name, version="0.1.0")
+    app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
 
     app.add_middleware(
         CORSMiddleware,
