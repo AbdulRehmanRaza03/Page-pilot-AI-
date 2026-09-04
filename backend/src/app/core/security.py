@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import os
-from datetime import datetime, timedelta, timezone
+import secrets
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -26,11 +26,12 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 def create_access_token(subject: str, extra: dict[str, Any] | None = None) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "sub": subject,
         "iat": now,
         "exp": now + timedelta(minutes=settings.access_token_ttl_minutes),
+        "jti": secrets.token_hex(16),
         "type": "access",
     }
     if extra:
@@ -39,11 +40,12 @@ def create_access_token(subject: str, extra: dict[str, Any] | None = None) -> st
 
 
 def create_refresh_token(subject: str) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {
         "sub": subject,
         "iat": now,
         "exp": now + timedelta(days=settings.refresh_token_ttl_days),
+        "jti": secrets.token_hex(16),
         "type": "refresh",
     }
     return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
