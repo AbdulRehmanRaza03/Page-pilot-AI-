@@ -51,8 +51,10 @@ def create_app() -> FastAPI:
 
     # Routers
     from app.modules.auth.router import router as auth_router
+    from app.modules.facebook.router import router as facebook_router
 
     app.include_router(auth_router, prefix=f"{settings.api_prefix}/auth", tags=["auth"])
+    app.include_router(facebook_router, prefix=f"{settings.api_prefix}/facebook", tags=["facebook"])
 
     return app
 
