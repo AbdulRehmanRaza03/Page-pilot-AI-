@@ -24,8 +24,9 @@ export function useAuth() {
     try {
       const me = await authApi.me();
       // Auto-select first workspace.
-      if (me.workspaces.length > 0 && !tokenStore.getWorkspaceId()) {
-        tokenStore.setWorkspaceId(me.workspaces[0].id);
+      const workspaces = me.workspaces ?? [];
+      if (workspaces.length > 0 && !tokenStore.getWorkspaceId()) {
+        tokenStore.setWorkspaceId(workspaces[0].id);
       }
       setState({ user: me, status: "authenticated" });
     } catch {

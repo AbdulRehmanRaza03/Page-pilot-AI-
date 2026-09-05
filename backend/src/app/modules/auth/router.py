@@ -9,13 +9,14 @@ from app.core.db import get_db
 from app.models import User
 from app.modules.auth.deps import get_current_user
 from app.modules.auth.service import login, refresh, register
+from app.modules.workspaces import service as workspaces_service
 from app.schemas.auth import (
     LoginRequest,
     RefreshRequest,
     RegisterRequest,
     TokenResponse,
-    UserOut,
 )
+from app.schemas.workspaces import MeResponse
 
 router = APIRouter(tags=["auth"])
 
@@ -42,11 +43,16 @@ async def refresh_route(data: RefreshRequest, db: Annotated[AsyncSession, Depend
     return await refresh(db, data.refresh_token)
 
 
-@router.get("/me", response_model=UserOut)
-async def me(user: Annotated[User, Depends(get_current_user)]) -> UserOut:
-    return UserOut(
+@router.get("/me", response_model=MeResponse)
+async def me(
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> MeResponse:
+    workspaces = await workspaces_service.list_workspaces(db, user)
+    return MeResponse(
         id=user.id,
         email=user.email,
         full_name=user.full_name,
         email_verified=user.email_verified_at is not None,
+        workspaces=workspaces,
     )
