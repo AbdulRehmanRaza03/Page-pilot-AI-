@@ -36,6 +36,19 @@ export function useAuth() {
   }, []);
 
   useEffect(() => {
+    // Handle OAuth callback tokens from the URL fragment
+    // (Google redirects back with #access_token=...&refresh_token=...).
+    const hash = window.location.hash;
+    if (hash && hash.includes("access_token")) {
+      const params = new URLSearchParams(hash.slice(1));
+      const access = params.get("access_token");
+      const refresh = params.get("refresh_token");
+      if (access && refresh) {
+        tokenStore.setTokens(access, refresh);
+        // Clean the URL.
+        window.history.replaceState(null, "", window.location.pathname);
+      }
+    }
     loadUser();
   }, [loadUser]);
 

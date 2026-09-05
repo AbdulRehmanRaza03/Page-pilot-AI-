@@ -44,8 +44,31 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_model: str = ""
 
+    # Google OAuth
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "http://localhost:8000/api/v1/auth/google/callback"
+    google_frontend_redirect: str = "http://localhost:3000/dashboard"
+
+    # Email (verification OTP / transactional)
+    email_provider: str = ""  # resend | sendgrid | smtp
+    email_api_key: str = ""
+    email_from: str = "PagePilot <no-reply@pagepilot.app>"
+
     # CORS — comma-separated string in env, split into a list.
     cors_origins: str = "http://localhost:3000"
+
+    @property
+    def google_base_url(self) -> str:
+        return "https://accounts.google.com/o/oauth2/v2/auth"
+
+    @property
+    def google_token_url(self) -> str:
+        return "https://oauth2.googleapis.com/token"
+
+    @property
+    def google_userinfo_url(self) -> str:
+        return "https://www.googleapis.com/oauth2/v2/userinfo"
 
     @property
     def cors_origin_list(self) -> list[str]:

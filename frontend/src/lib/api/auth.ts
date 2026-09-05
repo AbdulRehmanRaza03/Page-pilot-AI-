@@ -13,4 +13,5 @@ export const authApi = {
   refresh: (refreshToken: string) =>
     api.post<TokenResponse>("/auth/refresh", { refresh_token: refreshToken }),
   me: () => api.get<MeResponse>("/auth/me"),
+  googleStart: () => api.get<{ url: string; state: string }>("/auth/google/start"),
 };

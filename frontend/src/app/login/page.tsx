@@ -7,6 +7,7 @@ import { Globe, Lock, Mail, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthContext } from "@/components/auth-provider";
+import { authApi } from "@/lib/api/auth";
 
 function Logo({ className = "" }: { className?: string }) {
   return (
@@ -47,6 +48,16 @@ export default function LoginPage() {
       setError(err instanceof Error ? err.message : "Unable to sign in.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setError(null);
+    try {
+      const { url } = await authApi.googleStart();
+      window.location.href = url;
+    } catch {
+      setError("Unable to start Google sign-in.");
     }
   };
 
@@ -104,7 +115,7 @@ export default function LoginPage() {
 
           <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
             <div>
-              <label
+              <label 
                 htmlFor="email"
                 className="mb-1.5 block text-sm font-medium text-navy"
               >
@@ -197,9 +208,10 @@ export default function LoginPage() {
             variant="secondary"
             size="lg"
             className="w-full bg-white text-navy hover:bg-slate-50"
+            onClick={handleGoogleLogin}
           >
             <Globe className="h-4 w-4 text-brand-600" />
-            Connect with Facebook
+            Sign in with Google
           </Button>
 
           <p className="mt-8 text-center text-sm text-slate-500">
