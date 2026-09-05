@@ -17,6 +17,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuthContext } from "@/components/auth-provider";
 
 const navGroups = [
   {
@@ -55,6 +56,15 @@ const navGroups = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { user } = useAuthContext();
+  const name = user?.full_name || user?.email?.split("@")[0] || "User";
+  const initials = name
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+  const role = user?.workspaces?.find((w) => w.id)?.role ?? "Member";
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex">
@@ -115,11 +125,11 @@ export function Sidebar() {
       <div className="border-t border-slate-200 p-3">
         <div className="flex items-center gap-3 rounded-lg px-2 py-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-purple-600 text-sm font-semibold text-white">
-            AR
+            {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="truncate text-sm font-medium text-navy">Abdul Rehman</p>
-            <p className="truncate text-xs text-slate-400">Owner</p>
+            <p className="truncate text-sm font-medium text-navy">{name}</p>
+            <p className="truncate text-xs capitalize text-slate-400">{role}</p>
           </div>
         </div>
       </div>

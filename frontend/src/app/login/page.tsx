@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Globe, Lock, Mail, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuthContext } from "@/components/auth-provider";
 
 function Logo({ className = "" }: { className?: string }) {
   return (
@@ -25,10 +27,28 @@ function Logo({ className = "" }: { className?: string }) {
 }
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { login, status } = useAuthContext();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      await login(email, password);
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to sign in.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-indigo-50 via-white to-blue-50">
@@ -82,7 +102,7 @@ export default function LoginPage() {
             Sign in to your PagePilot workspace.
           </p>
 
-          <form className="mt-8 space-y-5" onSubmit={(e) => e.preventDefault()}>
+          <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
             <div>
               <label
                 htmlFor="email"
@@ -152,10 +172,16 @@ export default function LoginPage() {
               </label>
             </div>
 
-            <Button type="submit" size="lg" className="w-full">
+            <Button type="submit" size="lg" className="w-full" loading={loading} disabled={status === "authenticated"}>
               Sign in
               <ArrowRight className="h-4 w-4" />
             </Button>
+
+            {error && (
+              <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {error}
+              </p>
+            )}
           </form>
 
           <div className="my-6 flex items-center gap-3">

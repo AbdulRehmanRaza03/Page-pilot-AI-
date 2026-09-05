@@ -17,22 +17,52 @@ export class ApiError extends Error {
   }
 }
 
-const API_URL =
+export const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
-function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("pagepilot.access_token");
-}
+const ACCESS_TOKEN_KEY = "pagepilot.access_token";
+const REFRESH_TOKEN_KEY = "pagepilot.refresh_token";
+const WORKSPACE_KEY = "pagepilot.workspace_id";
+
+export const tokenStore = {
+  getAccessToken(): string | null {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem(ACCESS_TOKEN_KEY);
+  },
+  getRefreshToken(): string | null {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem(REFRESH_TOKEN_KEY);
+  },
+  setTokens(access: string, refresh: string) {
+    localStorage.setItem(ACCESS_TOKEN_KEY, access);
+    localStorage.setItem(REFRESH_TOKEN_KEY, refresh);
+  },
+  clear() {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem(WORKSPACE_KEY);
+  },
+  getWorkspaceId(): string | null {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem(WORKSPACE_KEY);
+  },
+  setWorkspaceId(id: string) {
+    localStorage.setItem(WORKSPACE_KEY, id);
+  },
+};
 
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
   const headers = new Headers(options.headers);
-  headers.set("Content-Type", "application/json");
-  const token = getToken();
+  if (!headers.has("Content-Type") && options.body) {
+    headers.set("Content-Type", "application/json");
+  }
+  const token = tokenStore.getAccessToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
+  const workspaceId = tokenStore.getWorkspaceId();
+  if (workspaceId) headers.set("X-Workspace-Id", workspaceId);
 
   const res = await fetch(`${API_URL}${path}`, { ...options, headers });
 

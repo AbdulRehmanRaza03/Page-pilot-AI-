@@ -2,6 +2,7 @@
 
 import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
+import { RequireAuth } from "@/components/require-auth";
 
 export function AppShell({
   title,
@@ -13,12 +14,14 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen">
-      <Sidebar />
-      <div className="lg:pl-64">
-        <Topbar title={title} subtitle={subtitle} />
-        <main className="p-6">{children}</main>
+    <RequireAuth>
+      <div className="min-h-screen">
+        <Sidebar />
+        <div className="lg:pl-64">
+          <Topbar title={title} subtitle={subtitle} />
+          <main className="p-6">{children}</main>
+        </div>
       </div>
-    </div>
+    </RequireAuth>
   );
 }
