@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     meta_app_secret: str = ""
     meta_graph_version: str = "v26.0"
     meta_webhook_verify_token: str = ""
+    meta_redirect_uri: str = "http://localhost:8000/api/v1/facebook/oauth/callback"
+    meta_frontend_redirect: str = "http://localhost:3000/pages"
 
     # LLM
     llm_provider: str = ""  # openai | anthropic

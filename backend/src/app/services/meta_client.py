@@ -77,6 +77,24 @@ class MetaClient:
 
     # --- OAuth / token exchange ---
 
+    async def exchange_code(self, code: str, redirect_uri: str) -> dict[str, Any]:
+        """Exchange an OAuth authorization code for a short-lived user token."""
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.get(
+                f"https://graph.facebook.com/{settings.meta_graph_version}/oauth/access_token",
+                params={
+                    "client_id": settings.meta_app_id,
+                    "client_secret": settings.meta_app_secret,
+                    "redirect_uri": redirect_uri,
+                    "code": code,
+                },
+            )
+            data = r.json()
+            if "error" in data:
+                err = data["error"]
+                raise MetaApiError(err.get("code"), err.get("message", "code exchange failed"))
+            return data
+
     async def exchange_long_lived_token(self, short_lived_token: str) -> dict[str, Any]:
         """Exchange a short-lived user token for a long-lived (~60 day) token."""
         r = await self._http.get(

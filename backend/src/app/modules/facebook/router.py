@@ -35,12 +35,43 @@ async def _get_account(db: AsyncSession, user_id) -> FacebookAccount:
 
 
 @router.get("/oauth/start")
-async def oauth_start(redirect_uri: str) -> dict:
+async def oauth_start() -> dict:
     """Return the Facebook Login URL the frontend should redirect the user to."""
     import secrets
 
+    from app.core.config import settings
+
     state = secrets.token_urlsafe(24)
-    return {"url": build_login_url(redirect_uri, state), "state": state}
+    return {
+        "url": build_login_url(settings.meta_redirect_uri, state),
+        "state": state,
+        "redirect_uri": settings.meta_redirect_uri,
+    }
+
+
+@router.get("/oauth/callback")
+async def oauth_callback(
+    code: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    workspace: Annotated[Workspace, Depends(get_workspace)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    """Handle the Facebook OAuth redirect: exchange code for a token,
+    then connect the account and redirect to the frontend pages screen."""
+    from fastapi.responses import RedirectResponse
+
+    from app.core.config import settings
+
+    try:
+        exchanged = await meta_client.exchange_code(code, settings.meta_redirect_uri)
+        short_token = exchanged.get("access_token")
+        if not short_token:
+            return RedirectResponse(url=f"{settings.meta_frontend_redirect}?facebook=error")
+        await service.connect_oauth_account(db, workspace, user, meta_client, short_token)
+    except Exception:
+        return RedirectResponse(url=f"{settings.meta_frontend_redirect}?facebook=error")
+
+    return RedirectResponse(url=f"{settings.meta_frontend_redirect}?facebook=connected")
 
 
 @router.post("/oauth/connect", response_model=FacebookAccountOut, status_code=201)
