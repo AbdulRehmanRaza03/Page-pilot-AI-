@@ -15,11 +15,14 @@ from app.core.config import settings
 GRAPH_BASE = f"https://graph.facebook.com/{settings.meta_graph_version}"
 
 # Permissions required for MVP (see docs/13-meta-integration.md).
+# We request the minimal set needed to list Pages and access Messenger.
+# `pages_read_engagement` is requested only when the app has been granted
+# Advanced Access; in Development mode we keep the minimal set to avoid
+# "Invalid Scopes" errors.
 MVP_PERMISSIONS = [
     "pages_show_list",
     "pages_messaging",
     "pages_manage_metadata",
-    "pages_read_engagement",
 ]
 
 
