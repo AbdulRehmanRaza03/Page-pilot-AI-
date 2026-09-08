@@ -74,6 +74,7 @@ async def oauth_callback(
 ):
     """Handle the Facebook OAuth redirect. Resolves the initiating user/workspace
     from the OAuth state token (callbacks cannot carry auth headers)."""
+    import logging
     from datetime import UTC, datetime
 
     from fastapi.responses import RedirectResponse
@@ -81,6 +82,8 @@ async def oauth_callback(
 
     from app.core.config import settings
     from app.models import OAuthState, User, Workspace
+
+    log = logging.getLogger("pagepilot.facebook")
 
     # Resolve state → user + workspace.
     result = await db.execute(
@@ -91,25 +94,30 @@ async def oauth_callback(
     )
     row = result.first()
     if row is None:
-        return RedirectResponse(url=f"{settings.meta_frontend_redirect}?facebook=error")
+        log.error("Facebook OAuth callback: state not found or already consumed")
+        return RedirectResponse(url=f"{settings.meta_frontend_redirect}?facebook=error&reason=invalid_state")
     oauth_state, user, workspace = row
 
     if oauth_state.expires_at < datetime.now(UTC):
-        return RedirectResponse(url=f"{settings.meta_frontend_redirect}?facebook=error")
+        log.error("Facebook OAuth callback: state expired")
+        return RedirectResponse(url=f"{settings.meta_frontend_redirect}?facebook=error&reason=state_expired")
 
     try:
         exchanged = await meta_client.exchange_code(code, settings.meta_redirect_uri)
         short_token = exchanged.get("access_token")
         if not short_token:
-            return RedirectResponse(url=f"{settings.meta_frontend_redirect}?facebook=error")
+            log.error("Facebook OAuth callback: token exchange returned no access_token")
+            return RedirectResponse(url=f"{settings.meta_frontend_redirect}?facebook=error&reason=no_token")
         await service.connect_oauth_account(db, workspace, user, meta_client, short_token)
-    except Exception:
-        return RedirectResponse(url=f"{settings.meta_frontend_redirect}?facebook=error")
+    except Exception as exc:
+        log.exception("Facebook OAuth callback failed: %s", exc)
+        return RedirectResponse(url=f"{settings.meta_frontend_redirect}?facebook=error&reason=exception")
 
     # One-time use: invalidate the consumed state.
     await db.delete(oauth_state)
     await db.commit()
 
+    log.info("Facebook OAuth connected for user %s", user.id)
     return RedirectResponse(url=f"{settings.meta_frontend_redirect}?facebook=connected")
 
 

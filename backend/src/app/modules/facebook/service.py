@@ -40,16 +40,17 @@ async def connect_oauth_account(
     )
 
     # Identify the app-scoped Facebook user id via debug_token.
+    # This is best-effort and non-blocking; fall back to a random id on failure.
+    fb_user_id = str(uuid.uuid4())
     try:
         debug = await meta.debug_token(long_lived)
-    except MetaApiError:
-        debug = {}
-
-    fb_user_id = debug.get("user_id", str(uuid.uuid4()))
+        fb_user_id = str(debug.get("user_id", fb_user_id))
+    except Exception:
+        pass
 
     account = FacebookAccount(
         user_id=user.id,
-        facebook_user_id=str(fb_user_id),
+        facebook_user_id=fb_user_id,
         long_lived_token_enc=encrypt_secret(long_lived),
         token_expires_at=expires_at,
     )
