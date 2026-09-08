@@ -71,15 +71,16 @@ async def receive_webhook(
     # Extract Page ID + events. Meta wraps events in entry[].
     entries = payload.get("entry", []) if isinstance(payload, dict) else []
 
-    workspace_id = None
-    page_id_fk = None
+    from app.services import message_processor
 
     for entry in entries:
         if not isinstance(entry, dict):
             continue
         meta_page_id = entry.get("id")
+        workspace_id = None
+        page_id_fk = None
         # Resolve to our FacebookPage (and its workspace).
-        page = await resolve_page(db, meta_page_id)
+        page = await message_processor.resolve_page(db, meta_page_id)
         if page is not None:
             workspace_id = page.workspace_id
             page_id_fk = page.id
@@ -88,15 +89,30 @@ async def receive_webhook(
         for event in messaging:
             if not isinstance(event, dict):
                 continue
+            msg = event.get("message", {}) or {}
+            mid = str(msg.get("mid") or uuid.uuid4())
             await store_event(
                 db,
                 workspace_id=workspace_id,
                 page_id=page_id_fk,
                 event_type="messages",
-                meta_event_id=str(event.get("message", {}).get("mid") or uuid.uuid4()),
+                meta_event_id=mid,
                 payload=event,
                 signature_valid=signature_valid,
             )
+
+            # If the Page belongs to a known workspace, persist Contact +
+            # Conversation + Message so it appears in the inbox.
+            sender_psid = (event.get("sender") or {}).get("id")
+            if workspace_id is not None and page_id_fk is not None and sender_psid:
+                await message_processor.process_inbound_message(
+                    db,
+                    workspace_id=workspace_id,
+                    page_id_fk=page_id_fk,
+                    sender_psid=str(sender_psid),
+                    meta_message_id=mid,
+                    text=msg.get("text"),
+                )
 
     # Always acknowledge quickly (200) to avoid Meta retries.
     return {"received": True}
