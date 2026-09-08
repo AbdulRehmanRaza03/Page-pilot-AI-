@@ -16,7 +16,7 @@ class Base(DeclarativeBase):
     """Declarative base for all ORM models."""
 
 
-engine = create_async_engine(settings.database_url, echo=settings.debug, future=True)
+engine = create_async_engine(settings.database_url, echo=False, future=True)
 
 async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
