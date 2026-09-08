@@ -14,8 +14,8 @@ class WebhookEvent(BaseModel):
 
     __tablename__ = "webhook_events"
 
-    workspace_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    workspace_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True, nullable=True
     )
     page_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("facebook_pages.id"), nullable=True)
     object: Mapped[str] = mapped_column(String(32), nullable=False)  # "page"
