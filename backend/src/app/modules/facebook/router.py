@@ -35,13 +35,30 @@ async def _get_account(db: AsyncSession, user_id) -> FacebookAccount:
 
 
 @router.get("/oauth/start")
-async def oauth_start() -> dict:
-    """Return the Facebook Login URL the frontend should redirect the user to."""
+async def oauth_start(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    workspace: Annotated[Workspace, Depends(get_workspace)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> dict:
+    """Return the Facebook Login URL and persist an OAuth state token."""
     import secrets
+    from datetime import UTC, datetime, timedelta
 
     from app.core.config import settings
+    from app.models import OAuthState
 
-    state = secrets.token_urlsafe(24)
+    state = secrets.token_urlsafe(32)
+    db.add(
+        OAuthState(
+            state=state,
+            user_id=user.id,
+            workspace_id=workspace.id,
+            provider="facebook",
+            expires_at=datetime.now(UTC) + timedelta(minutes=10),
+        )
+    )
+    await db.commit()
+
     return {
         "url": build_login_url(settings.meta_redirect_uri, state),
         "state": state,
@@ -52,15 +69,33 @@ async def oauth_start() -> dict:
 @router.get("/oauth/callback")
 async def oauth_callback(
     code: str,
+    state: str,
     db: Annotated[AsyncSession, Depends(get_db)],
-    workspace: Annotated[Workspace, Depends(get_workspace)],
-    user: Annotated[User, Depends(get_current_user)],
 ):
-    """Handle the Facebook OAuth redirect: exchange code for a token,
-    then connect the account and redirect to the frontend pages screen."""
+    """Handle the Facebook OAuth redirect. Resolves the initiating user/workspace
+    from the OAuth state token (callbacks cannot carry auth headers)."""
+    from datetime import UTC, datetime
+
     from fastapi.responses import RedirectResponse
+    from sqlalchemy import select
 
     from app.core.config import settings
+    from app.models import OAuthState, User, Workspace
+
+    # Resolve state → user + workspace.
+    result = await db.execute(
+        select(OAuthState, User, Workspace)
+        .join(User, User.id == OAuthState.user_id)
+        .outerjoin(Workspace, Workspace.id == OAuthState.workspace_id)
+        .where(OAuthState.state == state)
+    )
+    row = result.first()
+    if row is None:
+        return RedirectResponse(url=f"{settings.meta_frontend_redirect}?facebook=error")
+    oauth_state, user, workspace = row
+
+    if oauth_state.expires_at < datetime.now(UTC):
+        return RedirectResponse(url=f"{settings.meta_frontend_redirect}?facebook=error")
 
     try:
         exchanged = await meta_client.exchange_code(code, settings.meta_redirect_uri)
@@ -70,6 +105,10 @@ async def oauth_callback(
         await service.connect_oauth_account(db, workspace, user, meta_client, short_token)
     except Exception:
         return RedirectResponse(url=f"{settings.meta_frontend_redirect}?facebook=error")
+
+    # One-time use: invalidate the consumed state.
+    await db.delete(oauth_state)
+    await db.commit()
 
     return RedirectResponse(url=f"{settings.meta_frontend_redirect}?facebook=connected")
 

@@ -49,3 +49,21 @@ class OutboundJob(BaseModel):
     scheduled_for: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class OAuthState(BaseModel):
+    """Short-lived OAuth state token mapping to a user + workspace context.
+
+    Used by OAuth callback endpoints (which cannot carry auth headers) to
+    resolve the initiating user/workspace without exposing secrets.
+    """
+
+    __tablename__ = "oauth_states"
+
+    state: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True
+    )
+    provider: Mapped[str] = mapped_column(String(32), default="facebook", nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

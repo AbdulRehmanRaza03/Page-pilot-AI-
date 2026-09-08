@@ -36,7 +36,7 @@ from app.models.messaging import (
     MessageEvent,
     Note,
 )
-from app.models.platform import OutboundJob, WebhookEvent
+from app.models.platform import OAuthState, OutboundJob, WebhookEvent
 
 __all__ = [
     "User",
@@ -72,4 +72,5 @@ __all__ = [
     "AuditLog",
     "WebhookEvent",
     "OutboundJob",
+    "OAuthState",
 ]
