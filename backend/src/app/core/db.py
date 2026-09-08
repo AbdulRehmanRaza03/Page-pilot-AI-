@@ -16,7 +16,14 @@ class Base(DeclarativeBase):
     """Declarative base for all ORM models."""
 
 
-engine = create_async_engine(settings.database_url, echo=False, future=True)
+# PgBouncer (Supabase pooler) in transaction mode does not support prepared
+# statements. Disable asyncpg's statement cache to remain compatible.
+engine = create_async_engine(
+    settings.database_url,
+    echo=False,
+    future=True,
+    connect_args={"statement_cache_size": 0},
+)
 
 async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
