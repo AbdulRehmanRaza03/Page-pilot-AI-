@@ -82,8 +82,10 @@ function PagesContent() {
       setAvailable(data.pages);
       setSelected(new Set());
       setShowPicker(true);
-    } catch {
-      setError("Could not load your Facebook Pages. Is the account connected?");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setError("Could not load your Facebook Pages: " + msg);
+      setShowPicker(false);
     } finally {
       setPicking(false);
     }
@@ -118,8 +120,9 @@ function PagesContent() {
       }
       setShowPicker(false);
       await loadPages();
-    } catch {
-      setError("Failed to connect selected pages.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setError("Failed to connect selected pages: " + msg);
     } finally {
       setLinking(false);
     }

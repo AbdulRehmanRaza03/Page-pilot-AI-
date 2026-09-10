@@ -22,14 +22,24 @@ async def connect_oauth_account(
     meta: MetaClient,
     short_lived_token: str,
 ) -> FacebookAccount:
-    """Exchange short-lived token for long-lived, store the account, and return it."""
+    """Exchange short-lived token for long-lived (best-effort), store the account.
+
+    If the long-lived exchange fails, we still persist the short-lived token so
+    the account connection succeeds and Pages can be listed.
+    """
+    long_lived = short_lived_token
+    expires_in = None
     try:
         exchanged = await meta.exchange_long_lived_token(short_lived_token)
+        long_lived = exchanged.get("access_token", short_lived_token)
+        expires_in = exchanged.get("expires_in")
     except MetaApiError as exc:
-        raise MetaErr(f"Facebook token exchange failed: {exc.message}") from exc
+        # Non-fatal: proceed with the short-lived token.
+        import logging
 
-    long_lived = exchanged.get("access_token")
-    expires_in = exchanged.get("expires_in")  # seconds (optional)
+        logging.getLogger("pagepilot.facebook").warning(
+            "long-lived token exchange failed, storing short-lived token: %s", exc.message
+        )
 
     from datetime import UTC, datetime, timedelta
 
@@ -39,8 +49,7 @@ async def connect_oauth_account(
         else None
     )
 
-    # Identify the app-scoped Facebook user id via debug_token.
-    # This is best-effort and non-blocking; fall back to a random id on failure.
+    # Identify the app-scoped Facebook user id via debug_token (best-effort).
     fb_user_id = str(uuid.uuid4())
     try:
         debug = await meta.debug_token(long_lived)
@@ -57,6 +66,7 @@ async def connect_oauth_account(
     db.add(account)
     await db.flush()
     await db.commit()
+    await db.refresh(account)
     return account
 
 
