@@ -64,7 +64,15 @@ export async function apiFetch<T>(
   const workspaceId = tokenStore.getWorkspaceId();
   if (workspaceId) headers.set("X-Workspace-Id", workspaceId);
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  } catch (err) {
+    throw new ApiError(0, {
+      code: "network_error",
+      message: "Cannot reach the server. Is the backend running on " + API_URL + "?",
+    });
+  }
 
   if (!res.ok) {
     let body: ApiErrorBody = { code: "unknown", message: res.statusText };
