@@ -7,8 +7,6 @@ import type { MeResponse } from "@/types";
 type AuthContextValue = {
   user: MeResponse | null;
   status: "loading" | "authenticated" | "unauthenticated";
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, fullName?: string) => Promise<void>;
   logout: () => void;
 };
 

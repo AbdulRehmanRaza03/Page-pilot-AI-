@@ -52,28 +52,10 @@ export function useAuth() {
     loadUser();
   }, [loadUser]);
 
-  const login = useCallback(
-    async (email: string, password: string) => {
-      const tokens = await authApi.login(email, password);
-      tokenStore.setTokens(tokens.access_token, tokens.refresh_token);
-      await loadUser();
-    },
-    [loadUser]
-  );
-
-  const register = useCallback(
-    async (email: string, password: string, fullName?: string) => {
-      const tokens = await authApi.register(email, password, fullName);
-      tokenStore.setTokens(tokens.access_token, tokens.refresh_token);
-      await loadUser();
-    },
-    [loadUser]
-  );
-
   const logout = useCallback(() => {
     tokenStore.clear();
     setState({ user: null, status: "unauthenticated" });
   }, []);
 
-  return { ...state, login, register, logout, reload: loadUser };
+  return { ...state, logout, reload: loadUser };
 }
