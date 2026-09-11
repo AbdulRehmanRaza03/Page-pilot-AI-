@@ -4,24 +4,29 @@ Turns a raw Meta webhook `messages` event into persistent Contact,
 Conversation, and Message records — the core receive flow.
 
 Steps:
-  1. Identify Page (from entry.id / recipient.id)
+  1. Identify Page
   2. Identify Contact (find by PSID or create)
   3. Identify Conversation (find open thread or create)
   4. Store Message (dedupe by meta_message_id)
   5. Update conversation last_message_at + unread_count
+  6. Evaluate automations
 
 All idempotent: re-processing the same event is a no-op.
 """
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Contact, Conversation, FacebookPage, Message
+from app.core.security import decrypt_secret
+from app.models import Contact, Conversation, FacebookPage, Message, PageToken
+
+logger = logging.getLogger("pagepilot.messages")
 
 
 async def process_inbound_message(
@@ -34,13 +39,9 @@ async def process_inbound_message(
     text: str | None,
 ) -> Message:
     """Persist an inbound message, creating contact + conversation as needed."""
-    # 1. Contact: find by (workspace, psid) or create.
     contact = await _find_or_create_contact(db, workspace_id, page_id_fk, sender_psid)
-
-    # 2. Conversation: find open thread for (workspace, page, contact) or create.
     conversation = await _find_or_create_conversation(db, workspace_id, page_id_fk, contact.id)
 
-    # 3. Message: dedupe by meta_message_id.
     existing = await db.execute(
         select(Message).where(Message.meta_message_id == meta_message_id)
     )
@@ -59,14 +60,13 @@ async def process_inbound_message(
         meta_message_id=meta_message_id,
     )
     db.add(message)
-
-    # 4. Update conversation + contact timestamps.
     conversation.last_message_at = now
     conversation.unread_count = (conversation.unread_count or 0) + 1
     contact.last_interaction_at = now
-
     await db.commit()
     await db.refresh(message)
+
+    await run_automations(db, workspace_id, conversation, contact, text)
     return message
 
 
@@ -106,6 +106,71 @@ async def _find_or_create_conversation(
         db.add(conversation)
         await db.flush()
     return conversation
+
+
+async def run_automations(
+    db: AsyncSession,
+    workspace_id: uuid.UUID,
+    conversation: Conversation,
+    contact: Contact,
+    text: str | None,
+) -> None:
+    """Evaluate enabled automations and execute send_message actions."""
+    from app.models import Workspace
+    from app.modules.automations import service as automation_service
+
+    workspace = await db.get(Workspace, workspace_id)
+    if workspace is None:
+        return
+
+    actions = await automation_service.evaluate_for_message(
+        db, workspace, conversation, contact, text or ""
+    )
+
+    for action_type, config in actions:
+        if action_type == "send_message" and config.get("text"):
+            try:
+                await _send_automated_reply(db, conversation, config["text"])
+            except Exception:
+                logger.exception("Automation send failed for conversation %s", conversation.id)
+
+
+async def _send_automated_reply(db: AsyncSession, conversation: Conversation, text: str) -> Message:
+    """Send an automation reply through Meta and persist it as an outbound message."""
+    from app.services.meta_client import meta_client
+
+    contact = await db.get(Contact, conversation.contact_id)
+    page = await db.get(FacebookPage, conversation.page_id)
+    if contact is None or page is None:
+        raise ValueError("contact or page not found")
+
+    token_result = await db.execute(
+        select(PageToken)
+        .where(PageToken.facebook_page_id == page.id, PageToken.invalidated_at.is_(None))
+        .order_by(PageToken.created_at.desc())
+        .limit(1)
+    )
+    token_row = token_result.scalar_one_or_none()
+    if token_row is None:
+        raise ValueError("no valid page token")
+    page_token = decrypt_secret(token_row.token_enc)
+
+    result = await meta_client.send_message(page.page_id, page_token, contact.psid, text)
+
+    message = Message(
+        conversation_id=conversation.id,
+        workspace_id=conversation.workspace_id,
+        direction="outbound",
+        sender_type="automation",
+        type="text",
+        body=text,
+        meta_message_id=result.get("message_id"),
+    )
+    db.add(message)
+    conversation.last_message_at = datetime.now(UTC)
+    await db.commit()
+    await db.refresh(message)
+    return message
 
 
 async def resolve_page(db: AsyncSession, meta_page_id: str) -> FacebookPage | None:
