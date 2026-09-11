@@ -135,6 +135,33 @@ class MetaClient:
 
     # --- Pages ---
 
+    async def send_message(
+        self, page_id: str, page_token: str, recipient_psid: str, text: str,
+        messaging_type: str = "RESPONSE", tag: str | None = None,
+    ) -> dict[str, Any]:
+        """Send a message through the Meta Send API.
+
+        Uses the documented `/{page-id}/messages` endpoint with
+        `messaging_type` (RESPONSE/UPDATE/TAGGED). See docs/13.
+        """
+        params: dict[str, Any] = {"access_token": page_token}
+        if tag:
+            params["tag"] = tag
+        payload = {
+            "recipient": {"id": recipient_psid},
+            "messaging_type": messaging_type,
+            "message": {"text": text},
+        }
+        if tag:
+            payload["tag"] = tag
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.post(
+                f"https://graph.facebook.com/{settings.meta_graph_version}/{page_id}/messages",
+                params=params,
+                json=payload,
+            )
+        return self._parse(r)
+
     async def list_accounts(self, user_token: str) -> list[dict[str, Any]]:
         """Retrieve the Pages a user manages (id, name, category, access_token, tasks).
 

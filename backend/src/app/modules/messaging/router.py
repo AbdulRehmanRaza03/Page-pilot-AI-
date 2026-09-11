@@ -16,7 +16,9 @@ from app.schemas.messaging import (
     ContactUpdate,
     ConversationOut,
     MessageOut,
+    SendMessageRequest,
 )
+from app.services.meta_client import meta_client
 
 router = APIRouter(tags=["messaging"])
 
@@ -40,6 +42,20 @@ async def list_messages(
 ) -> list[MessageOut]:
     messages = await service.list_messages(db, workspace, conversation_id)
     return [MessageOut.model_validate(m) for m in messages]
+
+
+@router.post("/conversations/{conversation_id}/messages", response_model=MessageOut, status_code=201)
+async def send_message(
+    conversation_id: uuid.UUID,
+    body: SendMessageRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    workspace: Annotated[Workspace, Depends(get_workspace)],
+) -> MessageOut:
+    conversation = await service.get_conversation(db, workspace, conversation_id)
+    if conversation is None:
+        raise NotFoundError("conversation not found")
+    message = await service.send_reply(db, workspace, conversation, body.text, meta_client)
+    return MessageOut.model_validate(message)
 
 
 @router.get("/contacts", response_model=list[ContactOut])

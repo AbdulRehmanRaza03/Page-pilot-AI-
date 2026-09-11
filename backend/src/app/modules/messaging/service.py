@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Contact, Conversation, Message, Workspace
+from app.core.errors import MetaApiError as MetaErr
+from app.core.security import decrypt_secret
+from app.models import Contact, Conversation, FacebookPage, Message, PageToken, Workspace
 
 
 async def list_conversations(
@@ -87,3 +90,61 @@ async def list_contacts(
     stmt = stmt.order_by(Contact.last_interaction_at.desc())
     result = await db.execute(stmt)
     return list(result.scalars().all())
+
+
+async def send_reply(
+    db: AsyncSession,
+    workspace: Workspace,
+    conversation: Conversation,
+    text: str,
+    meta,
+) -> Message:
+    """Send a reply through Meta, persist the outgoing message, update conversation.
+
+    Enforces policy implicitly via messaging_type: we only send RESPONSE
+    (within the 24h window). If Meta rejects, the error propagates and nothing
+    is persisted as 'sent'.
+    """
+    contact = await db.get(Contact, conversation.contact_id)
+    page = await db.get(FacebookPage, conversation.page_id)
+    if contact is None or page is None:
+        from app.core.errors import NotFoundError
+
+        raise NotFoundError("contact or page not found")
+
+    # Retrieve the Page access token (decrypted).
+    token_result = await db.execute(
+        select(PageToken)
+        .where(PageToken.facebook_page_id == page.id, PageToken.invalidated_at.is_(None))
+        .order_by(PageToken.created_at.desc())
+        .limit(1)
+    )
+    token_row = token_result.scalar_one_or_none()
+    if token_row is None:
+        from app.core.errors import TokenError
+
+        raise TokenError("No valid Page token found")
+    page_token = decrypt_secret(token_row.token_enc)
+
+    try:
+        result = await meta.send_message(page.page_id, page_token, contact.psid, text)
+    except Exception as exc:
+        raise MetaErr(f"Failed to send: {getattr(exc, 'message', exc)}") from exc
+
+    meta_message_id = result.get("message_id")
+    now = datetime.now(UTC)
+    message = Message(
+        conversation_id=conversation.id,
+        workspace_id=workspace.id,
+        direction="outbound",
+        sender_type="human",
+        type="text",
+        body=text,
+        meta_message_id=meta_message_id,
+    )
+    db.add(message)
+    conversation.last_message_at = now
+    conversation.status = "open"
+    await db.commit()
+    await db.refresh(message)
+    return message
