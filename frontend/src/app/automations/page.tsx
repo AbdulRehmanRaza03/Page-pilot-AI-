@@ -1,204 +1,234 @@
 "use client";
 
-import {
-  MessageSquare,
-  Filter,
-  Send,
-  UserPlus,
-  Tag,
-  Clock,
-  BellRing,
-  Sparkles,
-  Pencil,
-  Trash2,
-  Plus,
-  Save,
-  Play,
-  Rocket,
-  MoreHorizontal,
-  ChevronDown,
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { Plus, Sparkles, Trash2, Zap } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { automationsApi, type Automation } from "@/lib/api/automations";
 
-type NodeKind = "trigger" | "condition" | "action";
-
-const automations = [
-  { name: "New lead welcome", status: true, lastRun: "2m ago" },
-  { name: "Lead follow-up", status: true, lastRun: "18m ago" },
-  { name: "Cart recovery", status: false, lastRun: "3d ago" },
-  { name: "Review request", status: true, lastRun: "1h ago" },
-];
-
-const nodes: {
-  kind: NodeKind;
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  description: string;
-}[] = [
-  { kind: "trigger", icon: MessageSquare, title: "New Message", description: "Customer sends a message" },
-  { kind: "condition", icon: Filter, title: "Lead Status", description: "Is the sender a hot lead?" },
-  { kind: "action", icon: Send, title: "Send Message", description: "Intro with product catalog" },
-  { kind: "action", icon: UserPlus, title: "Assign Lead", description: "Route to sales team" },
-  { kind: "action", icon: Tag, title: "Add Label", description: "Tag as “Interested”" },
-  { kind: "action", icon: Clock, title: "Wait", description: "Delay 24 hours" },
-  { kind: "action", icon: BellRing, title: "Notify Team", description: "Ping #sales channel" },
-  { kind: "action", icon: Sparkles, title: "AI Response", description: "Automatic smart reply" },
-];
-
-const kindStyles: Record<NodeKind, string> = {
-  trigger: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  condition: "border-amber-200 bg-amber-50 text-amber-700",
-  action: "border-brand-200 bg-brand-50 text-brand-700",
-};
-
-const kindLabel: Record<NodeKind, string> = {
-  trigger: "Trigger",
-  condition: "Condition",
-  action: "Action",
-};
+function formatDate(date: string): string {
+  if (!date) return "—";
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return date;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
 
 export default function AutomationsPage() {
+  const [automations, setAutomations] = useState<Automation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [name, setName] = useState("");
+  const [keyword, setKeyword] = useState("");
+  const [replyText, setReplyText] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const loadAutomations = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await automationsApi.list();
+      setAutomations(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load automations");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadAutomations();
+  }, []);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      setFormError("Name is required.");
+      return;
+    }
+    setFormError(null);
+    setCreating(true);
+    try {
+      await automationsApi.create({
+        name: name.trim(),
+        trigger: { type: "trigger", config: { event: "incoming_message" } },
+        ...(keyword.trim()
+          ? { condition: { type: "condition", config: { kind: "keyword", value: keyword.trim() } } }
+          : {}),
+        action: {
+          type: "action",
+          config: {
+            kind: "send_message",
+            text: replyText.trim() || `Automated reply for "${keyword.trim() || name.trim()}"`,
+          },
+        },
+      });
+      setName("");
+      setKeyword("");
+      setReplyText("");
+      await loadAutomations();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Failed to create automation");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleToggle = async (a: Automation) => {
+    const next = !a.enabled;
+    // Optimistic update
+    setAutomations((prev) =>
+      prev.map((item) => (item.id === a.id ? { ...item, enabled: next } : item))
+    );
+    try {
+      await automationsApi.toggle(a.id, next);
+    } catch {
+      // Revert on failure
+      setAutomations((prev) =>
+        prev.map((item) => (item.id === a.id ? { ...item, enabled: a.enabled } : item))
+      );
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await automationsApi.remove(id);
+      setAutomations((prev) => prev.filter((item) => item.id !== id));
+    } catch {
+      /* could surface an error toast here */
+    }
+  };
+
   return (
     <AppShell title="Automations" subtitle="Design powerful workflows that run on autopilot.">
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[300px_1fr]">
-        {/* Left: automation list */}
-        <div className="space-y-4">
-          <Card>
-            <CardContent className="pt-5">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-semibold text-navy">Your automations</h3>
-                <Button variant="ghost" size="sm">
-                  <Plus className="h-4 w-4" /> New
-                </Button>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px]">
+        {/* Main: automation list */}
+        <Card>
+          <CardContent className="pt-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold text-navy">Your automations</h3>
+              <span className="text-xs text-slate-500">
+                {loading ? "Loading…" : `${automations.length} total`}
+              </span>
+            </div>
+
+            {error && <p className="pt-3 text-sm text-red-600">{error}</p>}
+
+            {loading ? (
+              <div className="mt-3 space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 rounded-lg px-2 py-3">
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-1/2" />
+                      <Skeleton className="h-3 w-1/3" />
+                    </div>
+                    <Skeleton className="h-5 w-9 rounded-full" />
+                  </div>
+                ))}
               </div>
+            ) : !error && automations.length === 0 ? (
+              <div className="mt-3 px-2 py-10 text-center">
+                <Zap className="mx-auto h-8 w-8 text-slate-300" />
+                <p className="mt-2 text-sm font-medium text-navy">No automations yet</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Create your first automation to respond automatically.
+                </p>
+              </div>
+            ) : (
               <ul className="mt-3 divide-y divide-slate-100">
-                {automations.map((a, i) => (
-                  <li
-                    key={a.name}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-2 py-3",
-                      i === 0 ? "bg-brand-50/60" : "hover:bg-slate-50"
-                    )}
-                  >
+                {automations.map((a) => (
+                  <li key={a.id} className="flex items-center gap-3 rounded-lg px-2 py-3 hover:bg-slate-50">
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-navy">{a.name}</p>
-                      <p className="text-xs text-slate-400">Last run {a.lastRun}</p>
+                      <p className="text-xs text-slate-400">Created {formatDate(a.created_at)}</p>
                     </div>
-                    <Toggle enabled={a.status} />
+                    <button
+                      onClick={() => handleDelete(a.id)}
+                      className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                      aria-label={`Delete ${a.name}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                    <Toggle enabled={a.enabled} onClick={() => handleToggle(a)} />
                   </li>
                 ))}
               </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Right: create form */}
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="pt-5">
+              <h3 className="flex items-center gap-2 text-base font-semibold text-navy">
+                <Plus className="h-4 w-4 text-brand-600" /> New automation
+              </h3>
+              <form onSubmit={handleCreate} className="mt-3 space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-500">Name</label>
+                  <Input
+                    placeholder="e.g. Lead follow-up"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500">Keyword condition</label>
+                  <Input
+                    placeholder="e.g. pricing"
+                    value={keyword}
+                    onChange={(e) => setKeyword(e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500">Reply text</label>
+                  <Input
+                    placeholder="e.g. Thanks for reaching out!"
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                {formError && <p className="text-xs text-red-600">{formError}</p>}
+                <Button type="submit" loading={creating} className="w-full">
+                  <Plus className="h-4 w-4" /> Create automation
+                </Button>
+              </form>
             </CardContent>
           </Card>
 
           <Card>
             <CardContent className="pt-5 text-sm text-slate-500">
               <p className="flex items-center gap-2 font-medium text-navy">
-                <Sparkles className="h-4 w-4 text-brand-600" /> AI suggestions
+                <Sparkles className="h-4 w-4 text-brand-600" /> Automations
               </p>
               <p className="mt-2 text-xs leading-relaxed">
-                PagePilot noticed 31% of your leads drop off after the first reply. Try adding a
-                follow-up step.
+                Automations respond automatically when a customer sends a message matching your
+                keyword.
               </p>
-              <Button variant="outline" size="sm" className="mt-3 w-full">
-                Apply suggestion
-              </Button>
             </CardContent>
           </Card>
         </div>
-
-        {/* Main: canvas */}
-        <Card className="overflow-hidden">
-          {/* Toolbar */}
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-            <div className="flex items-center gap-2">
-              <h3 className="text-base font-semibold text-navy">New lead welcome</h3>
-              <Badge variant="neutral">Untitled</Badge>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm">
-                <Save className="h-4 w-4" /> Save
-              </Button>
-              <Button variant="outline" size="sm">
-                <Play className="h-4 w-4" /> Test
-              </Button>
-              <Button size="sm">
-                <Rocket className="h-4 w-4" /> Publish
-              </Button>
-              <Button variant="ghost" size="sm">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Canvas */}
-          <div className="bg-slate-50/60 p-8">
-            <div className="mx-auto max-w-md">
-              {nodes.map((node, i) => {
-                const Icon = node.icon;
-                return (
-                  <div key={i}>
-                    <div className="group relative flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-card transition-shadow hover:shadow-card-hover">
-                      <div
-                        className={cn(
-                          "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border",
-                          kindStyles[node.kind]
-                        )}
-                      >
-                        <Icon className="h-5 w-5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-navy">{node.title}</p>
-                          <span className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                            {kindLabel[node.kind]}
-                          </span>
-                        </div>
-                        <p className="truncate text-xs text-slate-500">{node.description}</p>
-                      </div>
-                      <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                        <button className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-navy">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button className="rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {i < nodes.length - 1 && (
-                      <div className="flex flex-col items-center py-1">
-                        <span className="h-6 w-px bg-slate-300" />
-                        <span className="-mt-0.5 rounded-full border border-slate-200 bg-white p-0.5 text-slate-400">
-                          <ChevronDown className="h-3 w-3" />
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              {/* Add step */}
-              <button className="mx-auto mt-2 flex items-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm font-medium text-slate-400 transition-colors hover:border-brand-300 hover:text-brand-600">
-                <Plus className="h-4 w-4" /> Add step
-              </button>
-            </div>
-          </div>
-        </Card>
       </div>
     </AppShell>
   );
 }
 
-function Toggle({ enabled }: { enabled: boolean }) {
+function Toggle({ enabled, onClick }: { enabled: boolean; onClick: () => void }) {
   return (
     <button
+      type="button"
       role="switch"
       aria-checked={enabled}
+      onClick={onClick}
       className={cn(
         "relative h-5 w-9 shrink-0 rounded-full transition-colors",
         enabled ? "bg-brand-600" : "bg-slate-200"

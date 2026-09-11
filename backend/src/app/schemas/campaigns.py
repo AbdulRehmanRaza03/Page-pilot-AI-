@@ -8,8 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class CampaignCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
-    page_id: UUID
     message: str = Field(min_length=1, max_length=2000)
+    page_id: UUID | None = None  # optional in MVP (no Page-scoped campaign targeting yet)
     audience_filter: dict | None = None  # e.g. {"lead_status": "qualified"}
 
 
