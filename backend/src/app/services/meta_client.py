@@ -6,11 +6,14 @@ See docs/13-meta-integration.md for the authoritative reference.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import httpx
 
 from app.core.config import settings
+
+logger = logging.getLogger("pagepilot.meta")
 
 GRAPH_BASE = f"https://graph.facebook.com/{settings.meta_graph_version}"
 
@@ -68,9 +71,24 @@ class MetaClient:
         return self._parse(r)
 
     def _parse(self, r: httpx.Response) -> dict[str, Any]:
-        data = r.json()
+        # Structured logging that never leaks tokens.
+        try:
+            data = r.json()
+        except Exception as exc:
+            logger.error("Meta response not JSON: status=%s url=%s", r.status_code, r.url)
+            raise MetaApiError(None, f"Meta returned non-JSON (HTTP {r.status_code})") from exc
+
         if "error" in data:
             err = data["error"]
+            logger.error(
+                "Meta API error: status=%s code=%s subcode=%s type=%s message=%s url=%s",
+                r.status_code,
+                err.get("code"),
+                err.get("error_subcode"),
+                err.get("type"),
+                err.get("message"),
+                r.url,
+            )
             raise MetaApiError(
                 code=err.get("code"),
                 subcode=err.get("error_subcode"),
@@ -118,11 +136,15 @@ class MetaClient:
     # --- Pages ---
 
     async def list_accounts(self, user_token: str) -> list[dict[str, Any]]:
-        """Retrieve the Pages a user manages (id, name, token, tasks)."""
+        """Retrieve the Pages a user manages (id, name, category, access_token, tasks).
+
+        Note: we request `picture{url}` as a nested field; requesting a bare
+        `picture` field can cause Graph API errors on some app types.
+        """
         data = await self._get(
             "/me/accounts",
             user_token,
-            params={"fields": "id,name,category,access_token,tasks,picture"},
+            params={"fields": "id,name,category,access_token,tasks,picture{url}"},
         )
         return data.get("data", [])
 

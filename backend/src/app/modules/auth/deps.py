@@ -48,24 +48,41 @@ async def get_workspace(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> Workspace:
-    """Resolve the active workspace from the X-Workspace-Id header (or query param)."""
+    """Resolve the active workspace from X-Workspace-Id header/query.
+
+    Falls back to the user's most recent workspace membership when no header
+    is provided (single-workspace MVP ergonomics; the header remains the
+    source of truth when present).
+    """
     raw = request.headers.get("x-workspace-id") or request.query_params.get("workspace_id")
-    if not raw:
-        raise ForbiddenError("workspace context required")
-    workspace = await db.get(Workspace, uuid.UUID(raw))
+
+    if raw:
+        workspace = await db.get(Workspace, uuid.UUID(raw))
+        if workspace is None or workspace.deleted_at is not None:
+            raise ForbiddenError("workspace not found")
+        result = await db.execute(
+            select(WorkspaceMember).where(
+                WorkspaceMember.workspace_id == workspace.id,
+                WorkspaceMember.user_id == user.id,
+            )
+        )
+        if result.scalar_one_or_none() is None:
+            raise ForbiddenError("not a member of this workspace")
+        return workspace
+
+    # Fallback: first (most recent) workspace membership for this user.
+    member_result = await db.execute(
+        select(WorkspaceMember)
+        .where(WorkspaceMember.user_id == user.id)
+        .order_by(WorkspaceMember.created_at.desc())
+        .limit(1)
+    )
+    member = member_result.scalar_one_or_none()
+    if member is None:
+        raise ForbiddenError("no workspace found for this user")
+    workspace = await db.get(Workspace, member.workspace_id)
     if workspace is None or workspace.deleted_at is not None:
         raise ForbiddenError("workspace not found")
-
-    # Verify membership.
-    result = await db.execute(
-        select(WorkspaceMember).where(
-            WorkspaceMember.workspace_id == workspace.id,
-            WorkspaceMember.user_id == user.id,
-        )
-    )
-    if result.scalar_one_or_none() is None:
-        raise ForbiddenError("not a member of this workspace")
-
     return workspace
 
 

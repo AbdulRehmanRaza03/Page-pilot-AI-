@@ -185,6 +185,10 @@ async def disconnect_page(db: AsyncSession, workspace: Workspace, page_id: str) 
 def _extract_picture(page: dict) -> str | None:
     picture = page.get("picture")
     if isinstance(picture, dict):
+        # Either picture.data.url or picture.url (from picture{url} field expansion).
+        url = picture.get("url")
+        if url:
+            return url
         data = picture.get("data")
         if isinstance(data, dict):
             return data.get("url")
