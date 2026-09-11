@@ -50,9 +50,11 @@ def create_app() -> FastAPI:
         return {"status": "ready"}
 
     # Routers
+    from app.modules.ai.router import router as ai_router
     from app.modules.analytics.router import router as analytics_router
     from app.modules.auth.router import router as auth_router
     from app.modules.automations.router import router as automations_router
+    from app.modules.campaigns.router import router as campaigns_router
     from app.modules.facebook.router import router as facebook_router
     from app.modules.messaging.router import router as messaging_router
     from app.modules.webhooks.router import router as webhooks_router
@@ -65,6 +67,8 @@ def create_app() -> FastAPI:
     app.include_router(messaging_router, prefix=f"{settings.api_prefix}", tags=["messaging"])
     app.include_router(analytics_router, prefix=f"{settings.api_prefix}/analytics", tags=["analytics"])
     app.include_router(automations_router, prefix=f"{settings.api_prefix}/automations", tags=["automations"])
+    app.include_router(campaigns_router, prefix=f"{settings.api_prefix}/campaigns", tags=["campaigns"])
+    app.include_router(ai_router, prefix=f"{settings.api_prefix}/ai", tags=["ai"])
 
     return app
 
