@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   Plus,
   Download,
-  Globe,
   MoreHorizontal,
   Mail,
   Filter,
@@ -16,131 +15,67 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { messagingApi, type Contact } from "@/lib/api/messaging";
 
-type LeadStatus = "New" | "Contacted" | "Qualified" | "Interested" | "Converted" | "Lost";
+function statusVariant(
+  status: string
+): "info" | "warning" | "neutral" | "success" | "danger" | "muted" {
+  const s = status.toLowerCase();
+  if (s.includes("new")) return "info";
+  if (s.includes("contact")) return "warning";
+  if (s.includes("qualif")) return "neutral";
+  if (s.includes("interest")) return "success";
+  if (s.includes("convert")) return "success";
+  if (s.includes("lost")) return "muted";
+  return "neutral";
+}
 
-const statusVariant: Record<LeadStatus, "info" | "warning" | "neutral" | "success" | "danger" | "muted"> = {
-  New: "info",
-  Contacted: "warning",
-  Qualified: "neutral",
-  Interested: "success",
-  Converted: "success",
-  Lost: "muted",
-};
-
-type Lead = {
-  id: string;
-  name: string;
-  email: string;
-  source: string;
-  page: string;
-  status: LeadStatus;
-  lastActivity: string;
-  assignedTo: string;
-  created: string;
-};
-
-const leads: Lead[] = [
-  {
-    id: "1",
-    name: "Maya Johnson",
-    email: "maya.j@example.com",
-    source: "Facebook",
-    page: "Acme Fitness",
-    status: "Qualified",
-    lastActivity: "2 min ago",
-    assignedTo: "Sarah Lee",
-    created: "Today",
-  },
-  {
-    id: "2",
-    name: "Liam Carter",
-    email: "liam.c@example.com",
-    source: "Instagram",
-    page: "Bloom Interiors",
-    status: "Interested",
-    lastActivity: "18 min ago",
-    assignedTo: "Sarah Lee",
-    created: "Today",
-  },
-  {
-    id: "3",
-    name: "Sofia Reyes",
-    email: "sofia.r@example.com",
-    source: "Facebook",
-    page: "Acme Fitness",
-    status: "New",
-    lastActivity: "1 hr ago",
-    assignedTo: "Unassigned",
-    created: "Today",
-  },
-  {
-    id: "4",
-    name: "Noah Williams",
-    email: "noah.w@example.com",
-    source: "Facebook",
-    page: "Bloom Interiors",
-    status: "Contacted",
-    lastActivity: "3 hr ago",
-    assignedTo: "David Kim",
-    created: "Yesterday",
-  },
-  {
-    id: "5",
-    name: "Emma Thompson",
-    email: "emma.t@example.com",
-    source: "Instagram",
-    page: "Acme Fitness",
-    status: "Converted",
-    lastActivity: "5 hr ago",
-    assignedTo: "David Kim",
-    created: "Yesterday",
-  },
-  {
-    id: "6",
-    name: "Olivia Brown",
-    email: "olivia.b@example.com",
-    source: "Facebook",
-    page: "Bloom Interiors",
-    status: "Lost",
-    lastActivity: "1 day ago",
-    assignedTo: "Sarah Lee",
-    created: "2 days ago",
-  },
-  {
-    id: "7",
-    name: "James Wilson",
-    email: "james.w@example.com",
-    source: "Facebook",
-    page: "Acme Fitness",
-    status: "Qualified",
-    lastActivity: "1 day ago",
-    assignedTo: "Unassigned",
-    created: "3 days ago",
-  },
-  {
-    id: "8",
-    name: "Ava Martinez",
-    email: "ava.m@example.com",
-    source: "Instagram",
-    page: "Bloom Interiors",
-    status: "New",
-    lastActivity: "2 days ago",
-    assignedTo: "David Kim",
-    created: "4 days ago",
-  },
-];
+function formatDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 export default function LeadsPage() {
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [query, setQuery] = useState("");
-  const filtered = leads.filter((l) => {
-    const q = query.toLowerCase();
-    return (
-      l.name.toLowerCase().includes(q) ||
-      l.email.toLowerCase().includes(q) ||
-      l.page.toLowerCase().includes(q)
-    );
-  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+    messagingApi
+      .listContacts()
+      .then((data) => {
+        if (!active) return;
+        setContacts(data);
+      })
+      .catch((err: unknown) => {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : "Failed to load leads");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase().trim();
+    if (!q) return contacts;
+    return contacts.filter((c) => (c.name ?? "").toLowerCase().includes(q));
+  }, [contacts, query]);
 
   return (
     <AppShell title="Leads" subtitle="Track and manage your pipeline">
@@ -175,7 +110,7 @@ export default function LeadsPage() {
         {/* table */}
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
+            <table className="w-full min-w-[760px] text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/60">
                   <th className="px-5 py-3">
@@ -184,97 +119,106 @@ export default function LeadsPage() {
                     </button>
                   </th>
                   <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Source
-                  </th>
-                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Page
-                  </th>
-                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
                     Status
                   </th>
                   <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Last Activity
+                    Score
                   </th>
                   <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Assigned To
-                  </th>
-                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Created
+                    Last Interaction
                   </th>
                   <th className="px-5 py-3" />
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((lead) => (
-                  <tr
-                    key={lead.id}
-                    className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/80"
-                  >
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-3">
-                        <Avatar name={lead.name} className="h-9 w-9" />
-                        <div>
-                          <p className="font-medium text-navy">{lead.name}</p>
-                          <p className="text-xs text-slate-400">{lead.email}</p>
+                {loading &&
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <tr key={i} className="border-b border-slate-100 last:border-0">
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <Skeleton className="h-9 w-9 rounded-full" />
+                          <div className="space-y-1.5">
+                            <Skeleton className="h-3.5 w-32" />
+                            <Skeleton className="h-3 w-20" />
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-1.5 text-slate-600">
-                        <Globe className="h-3.5 w-3.5 text-slate-400" />
-                        {lead.source}
-                      </div>
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-600">{lead.page}</td>
-                    <td className="px-5 py-3.5">
-                      <Badge variant={statusVariant[lead.status]}>{lead.status}</Badge>
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-500">{lead.lastActivity}</td>
-                    <td className="px-5 py-3.5">
-                      {lead.assignedTo === "Unassigned" ? (
-                        <span className="text-xs text-slate-400">Unassigned</span>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <Avatar name={lead.assignedTo} className="h-6 w-6 text-[10px]" />
-                          <span className="text-slate-600">{lead.assignedTo}</span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <Skeleton className="h-5 w-20 rounded-full" />
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <Skeleton className="h-3.5 w-8" />
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <Skeleton className="h-3.5 w-24" />
+                      </td>
+                      <td className="px-5 py-3.5" />
+                    </tr>
+                  ))}
+
+                {!loading &&
+                  !error &&
+                  filtered.map((contact) => (
+                    <tr
+                      key={contact.id}
+                      className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/80"
+                    >
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <Avatar
+                            name={contact.name ?? "Contact"}
+                            src={contact.profile_url ?? undefined}
+                            className="h-9 w-9"
+                          />
+                          <div>
+                            <p className="font-medium text-navy">{contact.name ?? "Contact"}</p>
+                            <p className="text-xs text-slate-400">{contact.psid}</p>
+                          </div>
                         </div>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-500">{lead.created}</td>
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          <Mail className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <Badge variant={statusVariant(contact.lead_status)}>
+                          {contact.lead_status}
+                        </Badge>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className="font-medium text-navy">{contact.lead_score}</span>
+                      </td>
+                      <td className="px-5 py-3.5 text-slate-500">
+                        {formatDate(contact.last_interaction_at)}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <Mail className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
 
+          {error && (
+            <div className="px-5 py-10 text-center">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+
+          {!loading && !error && filtered.length === 0 && (
+            <div className="px-5 py-16 text-center">
+              <p className="text-sm text-slate-400">No leads yet</p>
+            </div>
+          )}
+
           <div className="flex items-center justify-between border-t border-slate-200 px-5 py-3">
             <p className="text-xs text-slate-400">
-              Showing {filtered.length} of {leads.length} leads
+              Showing {filtered.length} of {contacts.length} leads
             </p>
-            <div className="flex items-center gap-1">
-              {["Prev", "1", "2", "Next"].map((p, i) => (
-                <button
-                  key={i}
-                  className={
-                    p === "1"
-                      ? "flex h-8 items-center rounded-lg bg-brand-600 px-3 text-xs font-medium text-white"
-                      : "flex h-8 items-center rounded-lg px-3 text-xs font-medium text-slate-600 hover:bg-slate-100"
-                  }
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
       </div>

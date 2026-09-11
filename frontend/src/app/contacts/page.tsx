@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   Plus,
   Download,
-  Globe,
   Mail,
   MoreHorizontal,
   Phone,
@@ -17,108 +16,67 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { messagingApi, type Contact } from "@/lib/api/messaging";
 
-type Tag = {
-  label: string;
-  variant: "success" | "warning" | "danger" | "info" | "muted" | "neutral";
-};
+function statusVariant(
+  status: string
+): "info" | "warning" | "neutral" | "success" | "danger" | "muted" {
+  const s = status.toLowerCase();
+  if (s.includes("new")) return "info";
+  if (s.includes("contact")) return "warning";
+  if (s.includes("qualif")) return "neutral";
+  if (s.includes("interest")) return "success";
+  if (s.includes("convert")) return "success";
+  if (s.includes("lost")) return "muted";
+  return "neutral";
+}
 
-type Contact = {
-  id: string;
-  name: string;
-  email: string;
-  page: string;
-  lastInteraction: string;
-  tags: Tag[];
-};
-
-const contacts: Contact[] = [
-  {
-    id: "1",
-    name: "Maya Johnson",
-    email: "maya.j@example.com",
-    page: "Acme Fitness",
-    lastInteraction: "2 min ago",
-    tags: [
-      { label: "VIP", variant: "warning" },
-      { label: "Newsletter", variant: "info" },
-    ],
-  },
-  {
-    id: "2",
-    name: "Liam Carter",
-    email: "liam.c@example.com",
-    page: "Bloom Interiors",
-    lastInteraction: "18 min ago",
-    tags: [{ label: "Customer", variant: "success" }],
-  },
-  {
-    id: "3",
-    name: "Sofia Reyes",
-    email: "sofia.r@example.com",
-    page: "Acme Fitness",
-    lastInteraction: "1 hr ago",
-    tags: [{ label: "Lead", variant: "neutral" }],
-  },
-  {
-    id: "4",
-    name: "Noah Williams",
-    email: "noah.w@example.com",
-    page: "Bloom Interiors",
-    lastInteraction: "3 hr ago",
-    tags: [
-      { label: "Wholesale", variant: "info" },
-      { label: "VIP", variant: "warning" },
-    ],
-  },
-  {
-    id: "5",
-    name: "Emma Thompson",
-    email: "emma.t@example.com",
-    page: "Acme Fitness",
-    lastInteraction: "5 hr ago",
-    tags: [{ label: "Customer", variant: "success" }],
-  },
-  {
-    id: "6",
-    name: "Olivia Brown",
-    email: "olivia.b@example.com",
-    page: "Bloom Interiors",
-    lastInteraction: "1 day ago",
-    tags: [{ label: "Newsletter", variant: "info" }],
-  },
-  {
-    id: "7",
-    name: "James Wilson",
-    email: "james.w@example.com",
-    page: "Acme Fitness",
-    lastInteraction: "2 days ago",
-    tags: [{ label: "Lead", variant: "neutral" }],
-  },
-  {
-    id: "8",
-    name: "Ava Martinez",
-    email: "ava.m@example.com",
-    page: "Bloom Interiors",
-    lastInteraction: "3 days ago",
-    tags: [
-      { label: "Customer", variant: "success" },
-      { label: "Newsletter", variant: "info" },
-    ],
-  },
-];
+function formatDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 export default function ContactsPage() {
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [query, setQuery] = useState("");
-  const filtered = contacts.filter((c) => {
-    const q = query.toLowerCase();
-    return (
-      c.name.toLowerCase().includes(q) ||
-      c.email.toLowerCase().includes(q) ||
-      c.page.toLowerCase().includes(q) ||
-      c.tags.some((t) => t.label.toLowerCase().includes(q))
-    );
-  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+    messagingApi
+      .listContacts()
+      .then((data) => {
+        if (!active) return;
+        setContacts(data);
+      })
+      .catch((err: unknown) => {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : "Failed to load contacts");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase().trim();
+    if (!q) return contacts;
+    return contacts.filter((c) => (c.name ?? "").toLowerCase().includes(q));
+  }, [contacts, query]);
 
   return (
     <AppShell title="Contacts" subtitle="Your audience, organized">
@@ -149,60 +107,101 @@ export default function ContactsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((contact) => (
-            <div
-              key={contact.id}
-              className="group rounded-xl border border-slate-200 bg-white p-5 shadow-card transition-shadow duration-200 hover:shadow-card-hover"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <Avatar name={contact.name} className="h-11 w-11" />
-                  <div>
-                    <p className="font-semibold text-navy">{contact.name}</p>
-                    <p className="text-xs text-slate-400">{contact.email}</p>
+        {error && (
+          <div className="rounded-xl border border-slate-200 bg-white px-5 py-10 text-center shadow-card">
+            <p className="text-sm text-red-600">{error}</p>
+          </div>
+        )}
+
+        {loading && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-slate-200 bg-white p-5 shadow-card"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="h-11 w-11 rounded-full" />
+                    <div className="space-y-1.5">
+                      <Skeleton className="h-4 w-28" />
+                      <Skeleton className="h-3 w-20" />
+                    </div>
                   </div>
                 </div>
-                <button className="text-slate-300 transition-colors hover:text-slate-500">
-                  <MoreHorizontal className="h-4 w-4" />
-                </button>
+                <div className="mt-4 space-y-2">
+                  <Skeleton className="h-5 w-2/3" />
+                </div>
+                <div className="mt-4 border-t border-slate-100 pt-4">
+                  <Skeleton className="h-3.5 w-32" />
+                </div>
               </div>
+            ))}
+          </div>
+        )}
 
-              <div className="mt-4 flex flex-wrap gap-1.5">
-                {contact.tags.map((tag) => (
-                  <Badge key={tag.label} variant={tag.variant}>
-                    {tag.label}
+        {!loading && !error && filtered.length === 0 && (
+          <div className="rounded-xl border border-slate-200 bg-white px-5 py-16 text-center shadow-card">
+            <p className="text-sm text-slate-400">No contacts yet</p>
+          </div>
+        )}
+
+        {!loading && !error && filtered.length > 0 && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((contact) => (
+              <div
+                key={contact.id}
+                className="group rounded-xl border border-slate-200 bg-white p-5 shadow-card transition-shadow duration-200 hover:shadow-card-hover"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar
+                      name={contact.name ?? "Contact"}
+                      src={contact.profile_url ?? undefined}
+                      className="h-11 w-11"
+                    />
+                    <div>
+                      <p className="font-semibold text-navy">{contact.name ?? "Contact"}</p>
+                      <p className="text-xs text-slate-400">{contact.psid}</p>
+                    </div>
+                  </div>
+                  <button className="text-slate-300 transition-colors hover:text-slate-500">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-1.5">
+                  <Badge variant={statusVariant(contact.lead_status)}>
+                    {contact.lead_status}
                   </Badge>
-                ))}
-              </div>
+                  <Badge variant="muted">Score {contact.lead_score}</Badge>
+                </div>
 
-              <div className="mt-4 border-t border-slate-100 pt-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                    <Globe className="h-3.5 w-3.5 text-slate-400" />
-                    {contact.page}
+                <div className="mt-4 border-t border-slate-100 pt-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500">Last interaction</span>
+                    <span className="text-xs text-slate-400">
+                      {formatDate(contact.last_interaction_at)}
+                    </span>
                   </div>
-                  <span className="text-xs text-slate-400">
-                    {contact.lastInteraction}
-                  </span>
+                </div>
+
+                <div className="mt-4 flex items-center gap-2">
+                  <Button variant="outline" size="sm" className="flex-1">
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    Message
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <Mail className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <Phone className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
-
-              <div className="mt-4 flex items-center gap-2">
-                <Button variant="outline" size="sm" className="flex-1">
-                  <MessageSquare className="h-3.5 w-3.5" />
-                  Message
-                </Button>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  <Mail className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  <Phone className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </AppShell>
   );
