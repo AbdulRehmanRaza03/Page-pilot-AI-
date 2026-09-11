@@ -50,6 +50,7 @@ def create_app() -> FastAPI:
         return {"status": "ready"}
 
     # Routers
+    from app.modules.analytics.router import router as analytics_router
     from app.modules.auth.router import router as auth_router
     from app.modules.facebook.router import router as facebook_router
     from app.modules.messaging.router import router as messaging_router
@@ -61,6 +62,7 @@ def create_app() -> FastAPI:
     app.include_router(workspaces_router, prefix=f"{settings.api_prefix}/workspaces", tags=["workspaces"])
     app.include_router(webhooks_router, prefix="/webhooks", tags=["webhooks"])
     app.include_router(messaging_router, prefix=f"{settings.api_prefix}", tags=["messaging"])
+    app.include_router(analytics_router, prefix=f"{settings.api_prefix}/analytics", tags=["analytics"])
 
     return app
 
