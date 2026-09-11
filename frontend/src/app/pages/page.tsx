@@ -78,8 +78,13 @@ function PagesContent() {
   const loadAvailablePages = async () => {
     setPicking(true);
     try {
-      const data = await facebookApi.availablePages();
-      setAvailable(data.pages);
+      const [data, connected] = await Promise.all([
+        facebookApi.availablePages(),
+        facebookApi.listPages(),
+      ]);
+      const connectedIds = new Set(connected.map((p) => p.page_id));
+      // Offer only pages that are not already connected.
+      setAvailable(data.pages.filter((p) => !connectedIds.has(p.page_id)));
       setSelected(new Set());
       setShowPicker(true);
     } catch (err) {
@@ -269,7 +274,7 @@ function PagesContent() {
                 </div>
               ) : available.length === 0 ? (
                 <p className="py-8 text-center text-sm text-slate-500">
-                  No Facebook Pages found for your account.
+                  No new Facebook Pages found — all available pages are already connected.
                 </p>
               ) : (
                 available.map((p) => (

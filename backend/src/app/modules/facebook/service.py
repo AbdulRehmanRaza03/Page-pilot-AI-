@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import ConflictError, NotFoundError
@@ -101,16 +102,24 @@ async def connect_page(
     meta: MetaClient,
     page_id: str,
 ) -> FacebookPage:
-    # Ensure not already connected.
+    # Ensure not already connected. The unique constraint is on page_id alone
+    # (a Meta Page can only belong to one PagePilot workspace), so we check
+    # globally rather than only within this workspace.
     existing = await db.execute(
-        select(FacebookPage).where(
-            FacebookPage.workspace_id == workspace.id,
-            FacebookPage.page_id == page_id,
-            FacebookPage.disconnected_at.is_(None),
-        )
+        select(FacebookPage).where(FacebookPage.page_id == page_id)
     )
-    if existing.scalar_one_or_none() is not None:
-        raise ConflictError("Page already connected")
+    existing_page = existing.scalar_one_or_none()
+    if existing_page is not None:
+        if existing_page.disconnected_at is None:
+            if existing_page.workspace_id == workspace.id:
+                # Already connected to THIS workspace: idempotent no-op.
+                return existing_page
+            raise ConflictError("Page already connected to another workspace")
+        # Reused Meta page that was previously disconnected: reassign to this
+        # workspace and re-activate it below.
+        existing_page.workspace_id = workspace.id
+        existing_page.disconnected_at = None
+        existing_page.status = "connected"
 
     token = decrypt_secret(account.long_lived_token_enc)
     try:
@@ -122,29 +131,50 @@ async def connect_page(
     if match is None:
         raise NotFoundError("Page not found among authorized Pages")
 
-    page = FacebookPage(
-        workspace_id=workspace.id,
-        facebook_account_id=account.id,
-        page_id=page_id,
-        name=match.get("name", ""),
-        category=match.get("category"),
-        picture_url=_extract_picture(match),
-        status="connected",
-        tasks=match.get("tasks"),
-    )
-    db.add(page)
-    await db.flush()
+    if existing_page is None:
+        page = FacebookPage(
+            workspace_id=workspace.id,
+            facebook_account_id=account.id,
+            page_id=page_id,
+            name=match.get("name", ""),
+            category=match.get("category"),
+            picture_url=_extract_picture(match),
+            status="connected",
+            tasks=match.get("tasks"),
+        )
+        db.add(page)
+        try:
+            await db.flush()
+        except IntegrityError:
+            await db.rollback()
+            raise ConflictError("Page already connected") from None
+    else:
+        page = existing_page
+        page.facebook_account_id = account.id
+        page.name = match.get("name", "") or page.name
+        page.category = match.get("category") or page.category
+        page.picture_url = _extract_picture(match) or page.picture_url
+        page.tasks = match.get("tasks") or page.tasks
 
     # Store the Page access token (encrypted).
     page_token = match.get("access_token")
     if page_token:
-        db.add(
-            PageToken(
-                facebook_page_id=page.id,
-                token_enc=encrypt_secret(page_token),
-                scopes=[],  # page tokens don't list scopes in /me/accounts
-            )
+        # Replace any existing token for this page instead of creating a duplicate.
+        token_result = await db.execute(
+            select(PageToken).where(PageToken.facebook_page_id == page.id)
         )
+        existing_token = token_result.scalar_one_or_none()
+        if existing_token is not None:
+            existing_token.token_enc = encrypt_secret(page_token)
+            existing_token.scopes = []
+        else:
+            db.add(
+                PageToken(
+                    facebook_page_id=page.id,
+                    token_enc=encrypt_secret(page_token),
+                    scopes=[],  # page tokens don't list scopes in /me/accounts
+                )
+            )
 
     await db.commit()
     await db.refresh(page)

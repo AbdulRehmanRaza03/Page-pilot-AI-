@@ -3,13 +3,11 @@ from __future__ import annotations
 import httpx
 import pytest_asyncio
 import respx
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.core.config import settings
 from app.core.db import Base
-from app.models import FacebookAccount
 from app.modules.facebook import service
-from app.schemas.facebook import ConnectPageRequest
 from app.services.meta_client import MetaClient
 
 GRAPH = f"https://graph.facebook.com/{settings.meta_graph_version}"
@@ -86,12 +84,20 @@ async def test_connect_page_flow(meta: MetaClient) -> None:
             assert page.page_id == "PAGE1"
             assert page.name == "ABC Clothing"
 
-            # Connect again -> conflict
+            # Connect again -> idempotent (same workspace returns existing page)
+            again = await service.connect_page(db, w, acct, meta, "PAGE1")
+            assert again.id == page.id
+
+            # A different workspace cannot claim the same Meta page.
+            w2 = Workspace(name="W2", slug="w2", owner_id=u.id)
+            db.add(w2)
+            await db.flush()
+
             import pytest
 
             from app.core.errors import ConflictError
 
             with pytest.raises(ConflictError):
-                await service.connect_page(db, w, acct, meta, "PAGE1")
+                await service.connect_page(db, w2, acct, meta, "PAGE1")
 
     await engine.dispose()
