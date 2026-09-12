@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import hashlib
-import hmac
-
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -37,7 +34,8 @@ async def test_webhook_verification(client: AsyncClient) -> None:
         },
     )
     assert res.status_code == 200
-    assert res.json()["hub.challenge"] == "12345"
+    assert res.headers["content-type"].startswith("text/plain")
+    assert res.text == "12345"
 
 
 async def test_webhook_verification_wrong_token(client: AsyncClient) -> None:
@@ -50,7 +48,7 @@ async def test_webhook_verification_wrong_token(client: AsyncClient) -> None:
             "hub.verify_token": "wrong",
         },
     )
-    assert res.json() == {}
+    assert res.status_code == 403
 
 
 async def test_webhook_receive(client: AsyncClient) -> None:

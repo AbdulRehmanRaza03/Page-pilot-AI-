@@ -17,7 +17,9 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Request
+from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.exceptions import HTTPException
 
 from app.core.config import settings
 from app.core.db import get_db
@@ -37,20 +39,29 @@ def verify_signature(payload_bytes: bytes, signature: str | None) -> bool:
 
 
 @router.get("/meta")
-async def verify_webhook(request: Request) -> dict:
+async def verify_webhook(request: Request) -> PlainTextResponse:
     """Meta calls this during webhook subscription (GET verify).
 
     Meta sends literal query params `hub.mode`, `hub.challenge`, and
     `hub.verify_token` (with dots), so we read them from raw query params.
+
+    On success we MUST return the challenge as raw plain-text with HTTP 200
+    (NOT a JSON object). On failure we return HTTP 403.
     """
     qp = request.query_params
     mode = qp.get("hub.mode")
     challenge = qp.get("hub.challenge")
     verify_token = qp.get("hub.verify_token")
 
-    if mode == "subscribe" and verify_token == settings.meta_webhook_verify_token and challenge:
-        return {"hub.challenge": challenge}
-    return {}
+    if (
+        mode == "subscribe"
+        and verify_token
+        and challenge
+        and settings.meta_webhook_verify_token
+        and hmac.compare_digest(verify_token, settings.meta_webhook_verify_token)
+    ):
+        return PlainTextResponse(content=challenge, status_code=200)
+    raise HTTPException(status_code=403, detail="Verification failed")
 
 
 @router.post("/meta")

@@ -7,7 +7,15 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.core.db import Base
 from app.main import app
-from app.models import Contact, Conversation, FacebookAccount, FacebookPage, Message, User, Workspace
+from app.models import (
+    Contact,
+    Conversation,
+    FacebookAccount,
+    FacebookPage,
+    Message,
+    User,
+    Workspace,
+)
 
 
 @pytest_asyncio.fixture
