@@ -47,20 +47,33 @@ class MockAIProvider(AIProvider):
 
 
 class OpenAIProvider(AIProvider):
-    """OpenAI-compatible chat completions provider."""
+    """OpenAI-compatible chat completions provider.
+
+    Supports both OpenAI and DeepSeek via the `llm_provider` setting:
+    - openai  -> https://api.openai.com/v1/chat/completions
+    - deepseek -> https://api.deepseek.com/chat/completions
+    """
+
+    def _base_url(self) -> str:
+        provider = (settings.llm_provider or "").lower()
+        if provider == "deepseek":
+            return "https://api.deepseek.com/chat/completions"
+        return "https://api.openai.com/v1/chat/completions"
 
     async def chat(self, messages: list[dict], context: str | None = None) -> str:
         system = (
             "You are PagePilot AI, a business automation assistant. Be concise and helpful. "
             f"Context: {context or 'No extra context provided.'}"
         )
+        provider = (settings.llm_provider or "").lower()
+        model = settings.llm_model or ("deepseek-chat" if provider == "deepseek" else "gpt-4o-mini")
         payload = {
-            "model": settings.llm_model or "gpt-4o-mini",
+            "model": model,
             "messages": [{"role": "system", "content": system}, *messages],
         }
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             r = await client.post(
-                "https://api.openai.com/v1/chat/completions",
+                self._base_url(),
                 headers={"Authorization": f"Bearer {settings.llm_api_key}"},
                 json=payload,
             )

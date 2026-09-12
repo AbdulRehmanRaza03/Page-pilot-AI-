@@ -70,24 +70,32 @@ export default function InboxPage() {
 
   useEffect(() => {
     let active = true;
+    const loadConversations = () => {
+      setListError(null);
+      Promise.all([messagingApi.listConversations(), messagingApi.listContacts()])
+        .then(([convs, ctcs]) => {
+          if (!active) return;
+          setConversations(convs);
+          setContacts(ctcs);
+          if (convs.length > 0) setActiveId((prev) => prev ?? convs[0].id);
+        })
+        .catch((err: unknown) => {
+          if (!active) return;
+          setListError(err instanceof Error ? err.message : "Failed to load conversations");
+        })
+        .finally(() => {
+          if (active) setListLoading(false);
+        });
+    };
+
     setListLoading(true);
-    setListError(null);
-    Promise.all([messagingApi.listConversations(), messagingApi.listContacts()])
-      .then(([convs, ctcs]) => {
-        if (!active) return;
-        setConversations(convs);
-        setContacts(ctcs);
-        if (convs.length > 0) setActiveId((prev) => prev ?? convs[0].id);
-      })
-      .catch((err: unknown) => {
-        if (!active) return;
-        setListError(err instanceof Error ? err.message : "Failed to load conversations");
-      })
-      .finally(() => {
-        if (active) setListLoading(false);
-      });
+    loadConversations();
+
+    // Poll for real-time updates (new inbound messages, unread counts).
+    const interval = setInterval(loadConversations, 15000);
     return () => {
       active = false;
+      clearInterval(interval);
     };
   }, []);
 
@@ -97,23 +105,31 @@ export default function InboxPage() {
       return;
     }
     let active = true;
+    const loadMessages = () => {
+      setMessagesError(null);
+      messagingApi
+        .listMessages(activeId)
+        .then((msgs) => {
+          if (!active) return;
+          setMessages(msgs);
+        })
+        .catch((err: unknown) => {
+          if (!active) return;
+          setMessagesError(err instanceof Error ? err.message : "Failed to load messages");
+        })
+        .finally(() => {
+          if (active) setMessagesLoading(false);
+        });
+    };
+
     setMessagesLoading(true);
-    setMessagesError(null);
-    messagingApi
-      .listMessages(activeId)
-      .then((msgs) => {
-        if (!active) return;
-        setMessages(msgs);
-      })
-      .catch((err: unknown) => {
-        if (!active) return;
-        setMessagesError(err instanceof Error ? err.message : "Failed to load messages");
-      })
-      .finally(() => {
-        if (active) setMessagesLoading(false);
-      });
+    loadMessages();
+
+    // Poll the active thread so new replies appear without a reload.
+    const interval = setInterval(loadMessages, 15000);
     return () => {
       active = false;
+      clearInterval(interval);
     };
   }, [activeId]);
 

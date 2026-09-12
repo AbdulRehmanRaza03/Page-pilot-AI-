@@ -179,6 +179,23 @@ class MetaClient:
         """Fetch basic Page metadata."""
         return await self._get(f"/{page_id}", page_token, params={"fields": "id,name,category"})
 
+    async def get_user_profile(self, psid: str, page_token: str) -> dict[str, Any]:
+        """Fetch a Messenger user's public profile (name + profile picture).
+
+        Uses the `/{psid}` endpoint with `fields=first_name,last_name,profile_pic`.
+        Returns `{}` on failure so callers can proceed without a crash.
+        """
+        try:
+            data = await self._get(
+                f"/{psid}",
+                page_token,
+                params={"fields": "first_name,last_name,profile_pic"},
+            )
+        except MetaApiError:
+            # Profile fetch is best-effort; never block message ingestion.
+            return {}
+        return data
+
     # --- Debug token (validate a token) ---
 
     async def debug_token(self, token: str) -> dict[str, Any]:

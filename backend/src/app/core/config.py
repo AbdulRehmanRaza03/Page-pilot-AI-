@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     meta_frontend_redirect: str = "http://localhost:3000/pages"
 
     # LLM
-    llm_provider: str = ""  # openai | anthropic
+    llm_provider: str = ""  # openai | deepseek | anthropic
     llm_api_key: str = ""
     llm_model: str = ""
 

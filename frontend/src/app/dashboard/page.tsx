@@ -74,8 +74,8 @@ export default function DashboardPage() {
   useEffect(() => {
     let active = true;
 
-    async function load() {
-      setLoading(true);
+    async function load(initial = false) {
+      if (initial) setLoading(true);
       setError(null);
       try {
         const [statsRes, convRes, contactsRes] = await Promise.all([
@@ -95,9 +95,12 @@ export default function DashboardPage() {
       }
     }
 
-    load();
+    load(true);
+    // Poll for real-time metric updates.
+    const interval = setInterval(() => load(false), 15000);
     return () => {
       active = false;
+      clearInterval(interval);
     };
   }, []);
 
@@ -224,21 +227,23 @@ export default function DashboardPage() {
               <p className="py-6 text-center text-sm text-slate-500">No conversations yet.</p>
             ) : (
               <ul className="divide-y divide-slate-100">
-                {conversations.slice(0, 5).map((c) => (
-                  <li key={c.id} className="flex items-center gap-3 py-3">
-                    <Avatar name={c.subject ?? "Chat"} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between">
-                        <p className="truncate text-sm font-medium text-navy">
-                          {c.subject ?? "Conversation"}
-                        </p>
-                        <span className="text-xs text-slate-400">{relativeTime(c.last_message_at)}</span>
+                {conversations.slice(0, 5).map((c) => {
+                  const contact = contacts.find((ct) => ct.id === c.contact_id);
+                  const name = contact?.name?.trim() || "Customer";
+                  return (
+                    <li key={c.id} className="flex items-center gap-3 py-3">
+                      <Avatar name={name} src={contact?.profile_url ?? undefined} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between">
+                          <p className="truncate text-sm font-medium text-navy">{name}</p>
+                          <span className="text-xs text-slate-400">{relativeTime(c.last_message_at)}</span>
+                        </div>
+                        <p className="truncate text-xs text-slate-500">{c.status}</p>
                       </div>
-                      <p className="truncate text-xs text-slate-500">{c.status}</p>
-                    </div>
-                    {c.unread_count > 0 && <span className="h-2 w-2 rounded-full bg-brand-600" />}
-                  </li>
-                ))}
+                      {c.unread_count > 0 && <span className="h-2 w-2 rounded-full bg-brand-600" />}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </CardContent>

@@ -42,6 +42,11 @@ async def process_inbound_message(
     contact = await _find_or_create_contact(db, workspace_id, page_id_fk, sender_psid)
     conversation = await _find_or_create_conversation(db, workspace_id, page_id_fk, contact.id)
 
+    # Best-effort enrichment: fetch the customer's name + avatar from Meta so the
+    # inbox shows a real name instead of a raw PSID. Never blocks ingestion.
+    if not contact.name:
+        await _enrich_contact(db, contact, page_id_fk)
+
     existing = await db.execute(
         select(Message).where(Message.meta_message_id == meta_message_id)
     )
@@ -106,6 +111,40 @@ async def _find_or_create_conversation(
         db.add(conversation)
         await db.flush()
     return conversation
+
+
+async def _enrich_contact(db: AsyncSession, contact: Contact, page_id_fk: uuid.UUID) -> None:
+    """Fetch the contact's name + avatar from Meta and persist it (best-effort)."""
+    try:
+        from app.services.meta_client import meta_client
+
+        page = await db.get(FacebookPage, page_id_fk)
+        if page is None:
+            return
+        token_result = await db.execute(
+            select(PageToken)
+            .where(PageToken.facebook_page_id == page.id, PageToken.invalidated_at.is_(None))
+            .order_by(PageToken.created_at.desc())
+            .limit(1)
+        )
+        token_row = token_result.scalar_one_or_none()
+        if token_row is None:
+            return
+        page_token = decrypt_secret(token_row.token_enc)
+
+        profile = await meta_client.get_user_profile(contact.psid, page_token)
+        first = profile.get("first_name")
+        last = profile.get("last_name")
+        pic = profile.get("profile_pic")
+        if first or last:
+            contact.name = f"{first or ''} {last or ''}".strip() or contact.name
+        if pic and not contact.profile_url:
+            contact.profile_url = pic
+        if first or last or pic:
+            await db.commit()
+    except Exception:
+        # Never let profile enrichment break message ingestion.
+        logger.exception("contact enrichment failed for contact %s", contact.id)
 
 
 async def run_automations(
