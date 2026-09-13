@@ -36,6 +36,30 @@ async def create_campaign(
     return CampaignOut.model_validate(campaign)
 
 
+@router.post("/{campaign_id}/toggle", response_model=CampaignOut)
+async def toggle_campaign(
+    campaign_id: uuid.UUID,
+    body: dict,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    workspace: Annotated[Workspace, Depends(get_workspace)],
+) -> CampaignOut:
+    enabled = bool(body.get("enabled", False))
+    campaign = await service.enable_campaign(db, workspace, campaign_id, enabled)
+    if campaign is None:
+        raise NotFoundError("campaign not found")
+    return CampaignOut.model_validate(campaign)
+
+
+@router.post("/{campaign_id}/send", response_model=dict)
+async def send_campaign(
+    campaign_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    workspace: Annotated[Workspace, Depends(get_workspace)],
+) -> dict:
+    summary = await service.run_pending_send(db, workspace, campaign_id)
+    return summary
+
+
 @router.delete("/{campaign_id}", status_code=204)
 async def delete_campaign(
     campaign_id: uuid.UUID,

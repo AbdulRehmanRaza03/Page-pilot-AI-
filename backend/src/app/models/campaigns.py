@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import BaseModel, JSONType, SoftDeleteMixin
@@ -20,6 +20,10 @@ class Campaign(BaseModel, SoftDeleteMixin):
     audience_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("campaign_audiences.id"), nullable=True)
     message_template: Mapped[str] = mapped_column(Text, nullable=False)
     schedule_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    page_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("facebook_pages.id"), nullable=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    sent_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
 
 
