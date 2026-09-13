@@ -16,6 +16,7 @@ router = APIRouter(tags=["ai"])
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
+    history: list[dict] = Field(default_factory=list)
 
 
 class ChatResponse(BaseModel):
@@ -29,5 +30,13 @@ async def chat(
     workspace: Annotated[Workspace, Depends(get_workspace)],
 ) -> ChatResponse:
     provider = get_provider()
-    reply = await provider.chat([{"role": "user", "content": body.message}])
+    # Build the full message list from history + the new user message so the
+    # assistant has conversation context instead of only the latest message.
+    messages = [
+        {"role": m.get("role", "user"), "content": m.get("content", "")}
+        for m in body.history
+        if m.get("role") in ("user", "assistant") and m.get("content")
+    ]
+    messages.append({"role": "user", "content": body.message})
+    reply = await provider.chat(messages)
     return ChatResponse(reply=reply)

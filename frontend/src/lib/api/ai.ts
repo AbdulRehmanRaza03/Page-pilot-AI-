@@ -4,7 +4,12 @@ export type ChatReply = {
   reply: string;
 };
 
+export type AIChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 export const aiApi = {
-  chat: (message: string) =>
-    api.post<ChatReply>("/ai/chat", { message }),
+  chat: (message: string, history: AIChatMessage[] = []) =>
+    api.post<ChatReply>("/ai/chat", { message, history }),
 };

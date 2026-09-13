@@ -30,6 +30,7 @@ import {
   type Message,
   type Contact,
 } from "@/lib/api/messaging";
+import { aiApi } from "@/lib/api/ai";
 
 const filters = [
   { key: "all", label: "All", icon: Inbox },
@@ -125,6 +126,9 @@ export default function InboxPage() {
     setMessagesLoading(true);
     loadMessages();
 
+    // Mark the conversation as read (resets the unread badge).
+    messagingApi.markRead(activeId).catch(() => {});
+
     // Poll the active thread so new replies appear without a reload.
     const interval = setInterval(loadMessages, 15000);
     return () => {
@@ -163,10 +167,30 @@ export default function InboxPage() {
     if (!activeId || !text || sending) return;
     setSending(true);
     setDraft("");
+
+    // Optimistic message: show it immediately so the UI feels instant even
+    // though Meta's Send API can take a moment. It gets replaced when the
+    // server confirms.
+    const tempId = `temp-${Date.now()}`;
+    const optimistic: Message = {
+      id: tempId,
+      conversation_id: activeId,
+      direction: "outbound",
+      sender_type: "human",
+      type: "text",
+      body: text,
+      meta_message_id: null,
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, optimistic]);
+
     try {
       const sent = await messagingApi.sendMessage(activeId, text);
-      setMessages((prev) => [...prev, sent]);
+      // Replace the optimistic message with the confirmed one.
+      setMessages((prev) => prev.map((m) => (m.id === tempId ? sent : m)));
     } catch (err: unknown) {
+      // Remove the optimistic message and restore the draft on failure.
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
       setDraft(text);
       setMessagesError(err instanceof Error ? err.message : "Failed to send message");
     } finally {
@@ -175,6 +199,26 @@ export default function InboxPage() {
   }
 
   const activeContact = active ? contacts.find((c) => c.id === active.contact_id) ?? null : null;
+
+  const [suggesting, setSuggesting] = useState(false);
+
+  async function handleAiSuggestion() {
+    if (!active) return;
+    // Find the latest inbound message as context for a suggested reply.
+    const lastInbound = [...messages].reverse().find((m) => m.direction === "inbound");
+    const prompt = lastInbound?.body
+      ? `Draft a short, friendly, professional reply to this customer message: "${lastInbound.body}"`
+      : "Draft a short, friendly, professional welcome reply to a customer.";
+    setSuggesting(true);
+    try {
+      const res = await aiApi.chat(prompt);
+      setDraft(res.reply.trim());
+    } catch {
+      setMessagesError("Unable to generate a suggestion. Please try again.");
+    } finally {
+      setSuggesting(false);
+    }
+  }
 
   return (
     <AppShell title="Inbox" subtitle="Manage all your page conversations in one place">
@@ -246,6 +290,7 @@ export default function InboxPage() {
               !listError &&
               filteredConversations.map((c) => {
                 const name = conversationName(c, contacts);
+                const contact = contacts.find((ct) => ct.id === c.contact_id);
                 return (
                   <button
                     key={c.id}
@@ -256,7 +301,7 @@ export default function InboxPage() {
                     )}
                   >
                     <div className="relative shrink-0">
-                      <Avatar name={name} />
+                      <Avatar name={name} src={contact?.profile_url ?? undefined} />
                       <span
                         className={cn(
                           "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white",
@@ -312,9 +357,9 @@ export default function InboxPage() {
                         Online
                       </span>
                     </div>
-                    <div className="flex items-center gap-1 text-xs text-slate-400">
+                  <div className="flex items-center gap-1 text-xs text-slate-400">
                       <Globe className="h-3 w-3" />
-                      {active.page_id}
+                      Facebook
                     </div>
                   </div>
                 </div>
@@ -401,6 +446,9 @@ export default function InboxPage() {
                     variant="outline"
                     size="sm"
                     className="h-8 gap-1.5 rounded-full border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100"
+                    onClick={handleAiSuggestion}
+                    loading={suggesting}
+                    disabled={suggesting}
                   >
                     <Sparkles className="h-3.5 w-3.5" />
                     AI suggestion

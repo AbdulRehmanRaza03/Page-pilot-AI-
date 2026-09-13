@@ -40,6 +40,8 @@ export const messagingApi = {
     api.get<Conversation[]>(`/conversations${buildQuery(params)}`),
   listMessages: (conversationId: string) =>
     api.get<Message[]>(`/conversations/${conversationId}/messages`),
+  markRead: (conversationId: string) =>
+    api.post<void>(`/conversations/${conversationId}/read`),
   sendMessage: (conversationId: string, text: string) =>
     api.post<Message>(`/conversations/${conversationId}/messages`, { text }),
   listContacts: (params?: { search?: string; lead_status?: string }) =>

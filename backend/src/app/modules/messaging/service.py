@@ -59,6 +59,23 @@ async def list_messages(
     return list(result.scalars().all())
 
 
+async def mark_read(
+    db: AsyncSession, workspace: Workspace, conversation_id: uuid.UUID
+) -> None:
+    """Reset the unread counter when the user views a conversation."""
+    result = await db.execute(
+        select(Conversation).where(
+            Conversation.workspace_id == workspace.id,
+            Conversation.id == conversation_id,
+            Conversation.deleted_at.is_(None),
+        )
+    )
+    conversation = result.scalar_one_or_none()
+    if conversation is not None and conversation.unread_count:
+        conversation.unread_count = 0
+        await db.commit()
+
+
 async def get_contact(
     db: AsyncSession, workspace: Workspace, contact_id: uuid.UUID
 ) -> Contact | None:

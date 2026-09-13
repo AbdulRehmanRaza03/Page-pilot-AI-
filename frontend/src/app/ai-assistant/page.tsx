@@ -34,13 +34,17 @@ export default function AiAssistantPage() {
     if (!text || sending) return;
 
     const userMessage: ChatMessage = { role: "user", content: text };
+    // Capture prior conversation (excluding the welcome message) as history.
+    const history = messages
+      .filter((m) => m !== WELCOME)
+      .map((m) => ({ role: m.role, content: m.content }));
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setError(null);
     setSending(true);
 
     try {
-      const res = await aiApi.chat(text);
+      const res = await aiApi.chat(text, history);
       setMessages((prev) => [...prev, { role: "assistant", content: res.reply }]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to get a reply");

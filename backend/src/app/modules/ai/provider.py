@@ -62,8 +62,13 @@ class OpenAIProvider(AIProvider):
 
     async def chat(self, messages: list[dict], context: str | None = None) -> str:
         system = (
-            "You are PagePilot AI, a business automation assistant. Be concise and helpful. "
-            f"Context: {context or 'No extra context provided.'}"
+            "You are PagePilot AI, the built-in business assistant inside a "
+            "Facebook Page messaging SaaS. You help the business owner with "
+            "conversations, leads, campaigns, and automations. Be concise, "
+            "actionable, and professional. If the user asks to do an external "
+            "action (send a message/campaign), explain what you would do and "
+            "ask for confirmation rather than claiming it was sent."
+            f"\n\nWorkspace context: {context or 'No extra context provided.'}"
         )
         provider = (settings.llm_provider or "").lower()
         model = settings.llm_model or ("deepseek-chat" if provider == "deepseek" else "gpt-4o-mini")

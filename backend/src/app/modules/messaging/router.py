@@ -58,6 +58,15 @@ async def send_message(
     return MessageOut.model_validate(message)
 
 
+@router.post("/conversations/{conversation_id}/read", status_code=204)
+async def mark_conversation_read(
+    conversation_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    workspace: Annotated[Workspace, Depends(get_workspace)],
+) -> None:
+    await service.mark_read(db, workspace, conversation_id)
+
+
 @router.get("/contacts", response_model=list[ContactOut])
 async def list_contacts(
     db: Annotated[AsyncSession, Depends(get_db)],
