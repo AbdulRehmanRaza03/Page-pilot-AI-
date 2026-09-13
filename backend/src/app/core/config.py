@@ -82,7 +82,13 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        origins = [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        # Always allow the local dev frontend. This prevents a wrong/garbled
+        # CORS value in .env (e.g. a truncated port) from breaking login.
+        for default in ("http://localhost:3000", "http://127.0.0.1:3000"):
+            if default not in origins:
+                origins.append(default)
+        return origins
 
 
 settings = Settings()
