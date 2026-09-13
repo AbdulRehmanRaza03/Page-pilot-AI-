@@ -182,14 +182,15 @@ class MetaClient:
     async def get_user_profile(self, psid: str, page_token: str) -> dict[str, Any]:
         """Fetch a Messenger user's public profile (name + profile picture).
 
-        Uses the `/{psid}` endpoint with `fields=first_name,last_name,profile_pic`.
-        Returns `{}` on failure so callers can proceed without a crash.
+        Requests both `profile_pic` and `picture` since the availability of
+        these fields varies by Graph API version. Returns `{}` on failure so
+        callers can proceed without a crash.
         """
         try:
             data = await self._get(
                 f"/{psid}",
                 page_token,
-                params={"fields": "first_name,last_name,profile_pic"},
+                params={"fields": "first_name,last_name,profile_pic,picture"},
             )
         except MetaApiError:
             # Profile fetch is best-effort; never block message ingestion.

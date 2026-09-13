@@ -135,7 +135,7 @@ async def _enrich_contact(db: AsyncSession, contact: Contact, page_id_fk: uuid.U
         profile = await meta_client.get_user_profile(contact.psid, page_token)
         first = profile.get("first_name")
         last = profile.get("last_name")
-        pic = profile.get("profile_pic")
+        pic = _extract_profile_pic(profile)
         if first or last:
             contact.name = f"{first or ''} {last or ''}".strip() or contact.name
         if pic and not contact.profile_url:
@@ -145,6 +145,23 @@ async def _enrich_contact(db: AsyncSession, contact: Contact, page_id_fk: uuid.U
     except Exception:
         # Never let profile enrichment break message ingestion.
         logger.exception("contact enrichment failed for contact %s", contact.id)
+
+
+def _extract_profile_pic(profile: dict) -> str | None:
+    """Extract a usable profile picture URL from either `profile_pic` (string)
+    or `picture` (object with .url or .data.url)."""
+    pic = profile.get("profile_pic")
+    if isinstance(pic, str) and pic:
+        return pic
+    picture = profile.get("picture")
+    if isinstance(picture, dict):
+        url = picture.get("url")
+        if url:
+            return url
+        data = picture.get("data")
+        if isinstance(data, dict):
+            return data.get("url")
+    return None
 
 
 async def run_automations(

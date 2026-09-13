@@ -24,6 +24,7 @@ import app.models  # noqa: F401  (register all models)
 from app.core.db import async_session_factory
 from app.core.security import decrypt_secret
 from app.models import Contact, FacebookPage
+from app.services.message_processor import _extract_profile_pic
 from app.services.meta_client import meta_client
 
 
@@ -75,7 +76,7 @@ async def main() -> None:
                 profile = await meta_client.get_user_profile(psid, page_token)
                 first = profile.get("first_name")
                 last = profile.get("last_name")
-                pic = profile.get("profile_pic")
+                pic = _extract_profile_pic(profile)
                 if not (first or last or pic):
                     continue
 
