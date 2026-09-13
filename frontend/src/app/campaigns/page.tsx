@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Globe, MessageSquare, Trash2, Send, Sparkles } from "lucide-react";
+import { Plus, Globe, MessageSquare, Trash2, Send, Sparkles, Square } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -125,11 +125,9 @@ export default function CampaignsPage() {
       setCampaigns((prev) =>
         prev.map((x) => (x.id === c.id ? { ...x, enabled: next, status: next ? "running" : "paused" } : x))
       );
-      // If enabling and no future schedule, trigger send immediately.
+      // If enabling and no future schedule, start the send in the background.
       if (next && !c.schedule_at) {
-        const summary = await campaignsApi.send(c.id);
-        void summary;
-        await loadCampaigns();
+        campaignsApi.send(c.id).catch(() => {});
       }
     } catch {
       /* surface error */
@@ -137,9 +135,23 @@ export default function CampaignsPage() {
   };
 
   const handleSendNow = async (c: Campaign) => {
+    // Fire-and-forget: the backend returns immediately and sends in background.
+    setCampaigns((prev) =>
+      prev.map((x) => (x.id === c.id ? { ...x, status: "running", enabled: true } : x))
+    );
     try {
       await campaignsApi.send(c.id);
-      await loadCampaigns();
+    } catch {
+      /* surface error */
+    }
+  };
+
+  const handleStop = async (c: Campaign) => {
+    try {
+      const updated = await campaignsApi.stop(c.id);
+      setCampaigns((prev) =>
+        prev.map((x) => (x.id === c.id ? updated : x))
+      );
     } catch {
       /* surface error */
     }
@@ -300,6 +312,17 @@ export default function CampaignsPage() {
                 >
                   <Send className="h-4 w-4" />
                 </button>
+                {c.status === "running" && (
+                  <button
+                    type="button"
+                    onClick={() => handleStop(c)}
+                    className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                    aria-label={`Stop ${c.name}`}
+                    title="Stop sending"
+                  >
+                    <Square className="h-4 w-4" />
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => handleToggle(c)}

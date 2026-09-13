@@ -31,6 +31,7 @@ export const campaignsApi = {
     api.post<Campaign>("/campaigns", input),
   toggle: (id: string, enabled: boolean) =>
     api.post<Campaign>(`/campaigns/${id}/toggle`, { enabled }),
+  stop: (id: string) => api.post<Campaign>(`/campaigns/${id}/stop`),
   send: (id: string) =>
     api.post<{ sent: number; skipped: number; failed: number }>(
       `/campaigns/${id}/send`

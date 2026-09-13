@@ -165,12 +165,18 @@ async def run_pending_send(
     failed = 0
     for recipient, contact in rows:
         try:
-            await meta_client.send_message(
+            result = await meta_client.send_message(
                 page.page_id, page_token, contact.psid, campaign.message_template
             )
             recipient.status = "sent"
             recipient.sent_at = datetime.now(UTC)
             sent += 1
+
+            # Persist the outbound message into the contact's conversation so it
+            # appears in the inbox chat (not just sent silently via Meta).
+            await _persist_outbound_message(
+                db, workspace, page.id, contact.id, campaign.message_template, result
+            )
             await db.commit()
         except MetaApiError as exc:
             recipient.status = "failed"
@@ -183,13 +189,63 @@ async def run_pending_send(
             failed += 1
             await db.commit()
 
+        # Check if the campaign was paused/stopped mid-send.
+        await db.refresh(campaign)
+        if not campaign.enabled:
+            break
+
         # Polite, human-like delay between sends (user-configured, min 5s).
         await asyncio.sleep(campaign.gap_seconds or 5)
 
     campaign.sent_count = (campaign.sent_count or 0) + sent
-    campaign.status = "completed"
+    campaign.status = "completed" if campaign.enabled else "paused"
     campaign.enabled = False
     await db.commit()
     await db.refresh(campaign)
 
     return {"sent": sent, "skipped": skipped, "failed": failed}
+
+
+async def _persist_outbound_message(
+    db: AsyncSession,
+    workspace: Workspace,
+    page_id: uuid.UUID,
+    contact_id: uuid.UUID,
+    text: str,
+    meta_result: dict,
+) -> None:
+    """Create/find the open conversation for a contact and append the outbound
+    message so it appears in the unified inbox."""
+    from app.models import Conversation, Message
+
+    conversation_result = await db.execute(
+        select(Conversation).where(
+            Conversation.workspace_id == workspace.id,
+            Conversation.page_id == page_id,
+            Conversation.contact_id == contact_id,
+            Conversation.status == "open",
+        )
+    )
+    conversation = conversation_result.scalar_one_or_none()
+    if conversation is None:
+        conversation = Conversation(
+            workspace_id=workspace.id,
+            page_id=page_id,
+            contact_id=contact_id,
+            status="open",
+        )
+        db.add(conversation)
+        await db.flush()
+
+    db.add(
+        Message(
+            conversation_id=conversation.id,
+            workspace_id=workspace.id,
+            direction="outbound",
+            sender_type="campaign",
+            type="text",
+            body=text,
+            meta_message_id=meta_result.get("message_id"),
+        )
+    )
+    conversation.last_message_at = datetime.now(UTC)

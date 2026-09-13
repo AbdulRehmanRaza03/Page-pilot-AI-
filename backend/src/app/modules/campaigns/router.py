@@ -50,14 +50,51 @@ async def toggle_campaign(
     return CampaignOut.model_validate(campaign)
 
 
+@router.post("/{campaign_id}/stop", response_model=CampaignOut)
+async def stop_campaign(
+    campaign_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    workspace: Annotated[Workspace, Depends(get_workspace)],
+) -> CampaignOut:
+    campaign = await service.enable_campaign(db, workspace, campaign_id, False)
+    if campaign is None:
+        raise NotFoundError("campaign not found")
+    return CampaignOut.model_validate(campaign)
+
+
 @router.post("/{campaign_id}/send", response_model=dict)
 async def send_campaign(
     campaign_id: uuid.UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
     workspace: Annotated[Workspace, Depends(get_workspace)],
 ) -> dict:
-    summary = await service.run_pending_send(db, workspace, campaign_id)
-    return summary
+    """Start the broadcast in the background and return immediately.
+
+    The actual sending runs in a background task so the HTTP request is fast.
+    """
+    from app.models import Campaign
+
+    # Mark the campaign as running right away so the UI updates instantly.
+    campaign = await db.get(Campaign, campaign_id)
+    if campaign is None or campaign.workspace_id != workspace.id:
+        raise NotFoundError("campaign not found")
+    campaign.enabled = True
+    campaign.status = "running"
+    await db.commit()
+
+    import asyncio
+
+    from app.core.db import async_session_factory
+
+    async def _run():
+        async with async_session_factory() as bg_db:
+            ws = await bg_db.get(Workspace, workspace.id)
+            if ws is None:
+                return
+            await service.run_pending_send(bg_db, ws, campaign_id)
+
+    asyncio.create_task(_run())
+    return {"started": True}
 
 
 @router.delete("/{campaign_id}", status_code=204)
