@@ -100,14 +100,23 @@ async def receive_webhook(
         for event in messaging:
             if not isinstance(event, dict):
                 continue
+
+            # Only handle real inbound `message` events. Skip:
+            #   - message_echoes (our own outbound messages echoed back)
+            #   - message_reads / message_deliveries (status events, no body)
+            #   - messaging_postbacks (button taps)
             msg = event.get("message", {}) or {}
-            mid = str(msg.get("mid") or uuid.uuid4())
+            is_echo = bool(event.get("message") and (msg.get("is_echo")))
+            mid = msg.get("mid")
+            if not mid or is_echo:
+                continue
+
             await store_event(
                 db,
                 workspace_id=workspace_id,
                 page_id=page_id_fk,
                 event_type="messages",
-                meta_event_id=mid,
+                meta_event_id=str(mid),
                 payload=event,
                 signature_valid=signature_valid,
             )
@@ -121,7 +130,7 @@ async def receive_webhook(
                     workspace_id=workspace_id,
                     page_id_fk=page_id_fk,
                     sender_psid=str(sender_psid),
-                    meta_message_id=mid,
+                    meta_message_id=str(mid),
                     text=msg.get("text"),
                 )
 

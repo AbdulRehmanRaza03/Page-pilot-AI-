@@ -42,9 +42,9 @@ async def process_inbound_message(
     contact = await _find_or_create_contact(db, workspace_id, page_id_fk, sender_psid)
     conversation = await _find_or_create_conversation(db, workspace_id, page_id_fk, contact.id)
 
-    # Best-effort enrichment: fetch the customer's name + avatar from Meta so the
-    # inbox shows a real name instead of a raw PSID. Never blocks ingestion.
-    if not contact.name:
+    # Enrich (name + avatar) only when the contact is brand-new, so we don't
+    # hit Meta's API on every single message (which slows ingestion).
+    if contact.name is None and contact.profile_url is None:
         await _enrich_contact(db, contact, page_id_fk)
 
     existing = await db.execute(
