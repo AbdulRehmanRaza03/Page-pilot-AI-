@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   Bot,
@@ -18,13 +19,14 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthContext } from "@/components/auth-provider";
+import { analyticsApi } from "@/lib/api/messaging";
 
 const navGroups = [
   {
     label: "Overview",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/inbox", label: "Inbox", icon: Inbox, badge: "12" },
+      { href: "/inbox", label: "Inbox", icon: Inbox, badge: true },
       { href: "/conversations", label: "Conversations", icon: MessagesSquare },
     ],
   },
@@ -57,6 +59,28 @@ const navGroups = [
 export function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuthContext();
+  const [unread, setUnread] = useState(0);
+
+  // Fetch the real unread count and poll so the badge stays in sync without
+  // a page refresh.
+  useEffect(() => {
+    let active = true;
+    const load = () => {
+      analyticsApi
+        .dashboard()
+        .then((d) => {
+          if (active) setUnread(d.unread_conversations ?? 0);
+        })
+        .catch(() => {});
+    };
+    load();
+    const interval = setInterval(load, 15000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   const name = user?.full_name || user?.email?.split("@")[0] || "User";
   const initials = name
     .split(" ")
@@ -107,9 +131,9 @@ export function Sidebar() {
                     >
                       <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
                       <span className="flex-1">{item.label}</span>
-                      {item.badge && (
+                      {item.badge && unread > 0 && (
                         <span className="rounded-full bg-brand-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                          {item.badge}
+                          {unread > 99 ? "99+" : unread}
                         </span>
                       )}
                     </Link>
