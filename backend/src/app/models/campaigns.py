@@ -24,6 +24,8 @@ class Campaign(BaseModel, SoftDeleteMixin):
     enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     sent_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    recipient_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    gap_seconds: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
 
 

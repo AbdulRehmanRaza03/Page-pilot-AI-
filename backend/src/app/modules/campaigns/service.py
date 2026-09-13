@@ -42,14 +42,16 @@ async def create_campaign(
         message_template=data.message,
         page_id=data.page_id,
         schedule_at=data.schedule_at,
+        recipient_limit=data.recipient_limit,
+        gap_seconds=data.gap_seconds,
         created_by=user_id,
         enabled=False,
     )
     db.add(campaign)
     await db.flush()
 
-    # Populate recipients from all (or filtered) contacts.
-    contacts = await _list_target_contacts(db, workspace, data.audience_filter)
+    # Populate recipients from all (or filtered) contacts, applying the limit.
+    contacts = await _list_target_contacts(db, workspace, data.audience_filter, data.recipient_limit)
     campaign.total_count = len(contacts)
     for contact in contacts:
         db.add(CampaignRecipient(campaign_id=campaign.id, contact_id=contact.id, status="pending"))
@@ -59,13 +61,14 @@ async def create_campaign(
 
 
 async def _list_target_contacts(
-    db: AsyncSession, workspace: Workspace, audience_filter: dict | None
+    db: AsyncSession, workspace: Workspace, audience_filter: dict | None, limit: int | None
 ) -> list[Contact]:
     stmt = select(Contact).where(
         Contact.workspace_id == workspace.id, Contact.deleted_at.is_(None)
     )
     if audience_filter and audience_filter.get("lead_status"):
         stmt = stmt.where(Contact.lead_status == audience_filter["lead_status"])
+    stmt = stmt.order_by(Contact.last_interaction_at.desc()).limit(limit)
     result = await db.execute(stmt)
     return list(result.scalars().all())
 
@@ -180,8 +183,8 @@ async def run_pending_send(
             failed += 1
             await db.commit()
 
-        # Small random-ish delay to be polite to Meta (configurable floor).
-        await asyncio.sleep(2)
+        # Polite, human-like delay between sends (user-configured, min 5s).
+        await asyncio.sleep(campaign.gap_seconds or 5)
 
     campaign.sent_count = (campaign.sent_count or 0) + sent
     campaign.status = "completed"

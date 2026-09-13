@@ -11,7 +11,9 @@ class CampaignCreate(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     page_id: UUID | None = None
     audience_filter: dict | None = None
-    schedule_at: datetime | None = None  # when to start sending (None = immediate)
+    schedule_at: datetime | None = None
+    recipient_limit: int | None = Field(default=None, ge=0)  # max recipients (None = all)
+    gap_seconds: int = Field(default=5, ge=5, le=300)  # delay between sends (min 5s)
 
 
 class CampaignOut(BaseModel):
@@ -26,4 +28,6 @@ class CampaignOut(BaseModel):
     enabled: bool
     sent_count: int
     total_count: int
+    recipient_limit: int | None
+    gap_seconds: int
     created_at: datetime

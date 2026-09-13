@@ -10,6 +10,8 @@ export type Campaign = {
   enabled: boolean;
   sent_count: number;
   total_count: number;
+  recipient_limit: number | null;
+  gap_seconds: number;
   created_at: string;
 };
 
@@ -19,6 +21,8 @@ export type CreateCampaignInput = {
   page_id?: string;
   audience_filter?: Record<string, string>;
   schedule_at?: string | null;
+  recipient_limit?: number | null;
+  gap_seconds?: number;
 };
 
 export const campaignsApi = {

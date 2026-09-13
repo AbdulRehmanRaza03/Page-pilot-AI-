@@ -55,6 +55,9 @@ export default function CampaignsPage() {
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
   const [scheduleAt, setScheduleAt] = useState("");
+  const [recipientLimit, setRecipientLimit] = useState<string>("all");
+  const [customLimit, setCustomLimit] = useState("");
+  const [gapSeconds, setGapSeconds] = useState(8);
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -80,6 +83,18 @@ export default function CampaignsPage() {
       setFormError("Template name and message are required.");
       return;
     }
+    // Resolve recipient limit: "all" -> null, or a number.
+    let limit: number | null = null;
+    if (recipientLimit === "custom") {
+      const n = parseInt(customLimit, 10);
+      if (Number.isNaN(n) || n < 1) {
+        setFormError("Enter a valid number of recipients.");
+        return;
+      }
+      limit = n;
+    } else if (recipientLimit !== "all") {
+      limit = parseInt(recipientLimit, 10);
+    }
     setFormError(null);
     setCreating(true);
     try {
@@ -87,10 +102,14 @@ export default function CampaignsPage() {
         name: name.trim(),
         message: message.trim(),
         schedule_at: scheduleAt ? new Date(scheduleAt).toISOString() : null,
+        recipient_limit: limit,
+        gap_seconds: gapSeconds,
       });
       setName("");
       setMessage("");
       setScheduleAt("");
+      setRecipientLimit("all");
+      setCustomLimit("");
       await loadCampaigns();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Failed to create campaign");
@@ -174,9 +193,49 @@ export default function CampaignsPage() {
               onChange={(e) => setMessage(e.target.value)}
               className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-navy placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
             />
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-500">Recipients</label>
+                <select
+                  value={recipientLimit}
+                  onChange={(e) => setRecipientLimit(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-navy focus:border-brand-500 focus:outline-none"
+                >
+                  <option value="all">All leads</option>
+                  <option value="5">First 5</option>
+                  <option value="10">First 10</option>
+                  <option value="50">First 50</option>
+                  <option value="custom">Custom…</option>
+                </select>
+              </div>
+              {recipientLimit === "custom" && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-500">How many?</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    placeholder="e.g. 25"
+                    value={customLimit}
+                    onChange={(e) => setCustomLimit(e.target.value)}
+                  />
+                </div>
+              )}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-500">Gap between sends (seconds, min 5)</label>
+                <Input
+                  type="number"
+                  min={5}
+                  max={300}
+                  value={gapSeconds}
+                  onChange={(e) => setGapSeconds(Math.max(5, parseInt(e.target.value, 10) || 5))}
+                />
+              </div>
+            </div>
+
             <div className="flex items-center justify-between">
               <p className="text-xs text-slate-400">
-                {scheduleAt ? `Will send at ${formatSchedule(new Date(scheduleAt).toISOString())}` : "Sends immediately to all leads"}
+                {scheduleAt ? `Will send at ${formatSchedule(new Date(scheduleAt).toISOString())}` : "Sends immediately"} · gap {gapSeconds}s
               </p>
               <Button type="submit" loading={creating}>
                 <Plus className="h-4 w-4" /> Create template
