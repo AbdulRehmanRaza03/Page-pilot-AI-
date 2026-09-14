@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { LogOut } from "lucide-react";
 import {
   Bot,
   LayoutDashboard,
@@ -58,8 +59,14 @@ const navGroups = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { user } = useAuthContext();
+  const router = useRouter();
+  const { user, logout } = useAuthContext();
   const [unread, setUnread] = useState(0);
+
+  const handleLogout = () => {
+    logout();
+    router.replace("/login");
+  };
 
   // Fetch the real unread count and poll so the badge stays in sync without
   // a page refresh.
@@ -155,6 +162,15 @@ export function Sidebar() {
             <p className="truncate text-sm font-medium text-navy">{name}</p>
             <p className="truncate text-xs capitalize text-slate-400">{role}</p>
           </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
+            aria-label="Logout"
+            title="Logout"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </aside>
