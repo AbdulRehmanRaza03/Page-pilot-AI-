@@ -75,9 +75,13 @@ async def google_callback(
     """Handle the Google OAuth redirect. Exchanges code, finds/creates user,
     then redirects to the frontend with tokens in the URL fragment.
     """
+    import logging
+
     from fastapi.responses import RedirectResponse
 
     from app.core.config import settings
+
+    log = logging.getLogger("pagepilot.auth")
 
     try:
         tokens = await google_oauth.exchange_code(code)
@@ -87,14 +91,21 @@ async def google_callback(
         info = await google_oauth.get_userinfo(access)
         email = info.get("email")
         name = info.get("name")
-    except Exception:
+    except Exception as exc:
+        log.exception("Google token exchange / userinfo failed: %s", exc)
         return RedirectResponse(
-            url=f"{settings.google_frontend_redirect}?auth=error"
+            url=f"{settings.google_frontend_redirect}?auth=error&reason=exchange"
         )
 
     from app.modules.auth.google_service import google_login
 
-    result = await google_login(db, email, name, None, None)
+    try:
+        result = await google_login(db, email, name, None, None)
+    except Exception as exc:
+        log.exception("Google login (find/create user) failed: %s", exc)
+        return RedirectResponse(
+            url=f"{settings.google_frontend_redirect}?auth=error&reason=login"
+        )
 
     return RedirectResponse(
         url=(

@@ -46,8 +46,17 @@ def create_app() -> FastAPI:
 
     @app.get("/readyz", tags=["health"])
     async def readyz() -> dict:
-        # TODO: check DB + Redis connectivity once wired up.
-        return {"status": "ready"}
+        # Check DB connectivity so deployment issues are visible immediately.
+        try:
+            from sqlalchemy import text
+
+            from app.core.db import async_session_factory
+
+            async with async_session_factory() as db:
+                await db.execute(text("SELECT 1"))
+            return {"status": "ready", "db": "ok"}
+        except Exception as exc:  # noqa: BLE001
+            return {"status": "not_ready", "db": str(exc)}
 
     # Routers
     from app.modules.ai.router import router as ai_router
