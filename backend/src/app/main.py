@@ -13,13 +13,13 @@ from app.core.logging import setup_logging
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Local demo convenience: auto-create tables for SQLite.
-    # Production uses Alembic migrations against PostgreSQL.
-    if settings.database_url.startswith("sqlite"):
-        from app.core.db import Base, engine
+    # Auto-create tables on startup (idempotent — only missing tables are created,
+    # existing data is never dropped). Ensures a fresh deploy works without a
+    # separate manual migration step.
+    from app.core.db import Base, engine
 
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     yield
 
 
