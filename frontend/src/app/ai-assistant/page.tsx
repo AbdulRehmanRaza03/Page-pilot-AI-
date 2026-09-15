@@ -9,6 +9,8 @@ import { aiApi } from "@/lib/api/ai";
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
+  tool?: string | null;
+  data?: any | null;
 };
 
 const WELCOME: ChatMessage = {
@@ -45,7 +47,10 @@ export default function AiAssistantPage() {
 
     try {
       const res = await aiApi.chat(text, history);
-      setMessages((prev) => [...prev, { role: "assistant", content: res.reply }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: res.reply, tool: res.tool, data: res.data },
+      ]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to get a reply");
     } finally {
@@ -74,6 +79,23 @@ export default function AiAssistantPage() {
                 <div className="max-w-[85%]">
                   <div className="rounded-2xl rounded-tl-md border border-slate-200 bg-white px-4 py-3 shadow-card">
                     <p className="whitespace-pre-wrap text-sm text-navy">{m.content}</p>
+                    {m.data?.contacts && (
+                      <div className="mt-3 border-t border-slate-100 pt-3">
+                        <p className="mb-2 text-xs font-semibold text-slate-500">
+                          {m.data.contacts.length} contact(s)
+                        </p>
+                        <ul className="space-y-1.5">
+                          {m.data.contacts.slice(0, 10).map((c: any) => (
+                            <li key={c.id} className="flex items-center justify-between text-xs">
+                              <span className="font-medium text-navy">{c.name}</span>
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 capitalize text-slate-500">
+                                {c.lead_status}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
