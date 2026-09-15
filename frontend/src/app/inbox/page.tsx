@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Search,
   Inbox,
@@ -10,8 +10,6 @@ import {
   Tag,
   Globe,
   Phone,
-  Paperclip,
-  Smile,
   Send,
   Sparkles,
   MoreVertical,
@@ -69,6 +67,7 @@ export default function InboxPage() {
 
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -139,6 +138,11 @@ export default function InboxPage() {
   }, [activeId]);
 
   const active = conversations.find((c) => c.id === activeId) ?? null;
+
+  // Auto-scroll to the latest message whenever messages change.
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const filteredConversations = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -452,25 +456,13 @@ export default function InboxPage() {
                       </div>
                     </div>
                   ))}
+                <div ref={messagesEndRef} />
               </div>
 
               {/* composer */}
-              <div className="border-t border-slate-200 p-4">
-                <div className="mb-2 flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 gap-1.5 rounded-full border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100"
-                    onClick={handleAiSuggestion}
-                    loading={suggesting}
-                    disabled={suggesting}
-                  >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    AI suggestion
-                  </Button>
-                </div>
+              <div className="shrink-0 border-t border-slate-200 p-3">
                 <div className="flex items-end gap-2">
-                  <div className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
+                  <div className="flex min-w-0 flex-1 items-end gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
                     <textarea
                       rows={1}
                       placeholder="Type a reply…"
@@ -482,29 +474,28 @@ export default function InboxPage() {
                           handleSend();
                         }
                       }}
-                      className="w-full resize-none bg-transparent text-sm text-navy placeholder:text-slate-400 focus:outline-none"
+                      className="max-h-24 w-full resize-none bg-transparent text-sm text-navy placeholder:text-slate-400 focus:outline-none"
                     />
-                    <div className="mt-2 flex items-center justify-between">
-                      <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          <Paperclip className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          <Smile className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <span className="text-[11px] text-slate-400">Enter to send</span>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAiSuggestion}
+                      disabled={suggesting}
+                      className="hidden shrink-0 rounded-full p-1.5 text-brand-600 hover:bg-brand-50 sm:block"
+                      aria-label="AI suggestion"
+                      title="AI suggestion"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                    </button>
                   </div>
-                  <Button
-                    size="md"
-                    className="h-11 w-11 shrink-0 p-0"
-                    loading={sending}
-                    disabled={!draft.trim()}
+                  <button
+                    type="button"
                     onClick={handleSend}
+                    disabled={!draft.trim()}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-50 disabled:pointer-events-none"
+                    aria-label="Send message"
                   >
                     <Send className="h-4 w-4" />
-                  </Button>
+                  </button>
                 </div>
               </div>
             </>
