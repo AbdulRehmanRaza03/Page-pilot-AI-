@@ -26,5 +26,6 @@ class MeResponse(BaseModel):
     id: UUID
     email: str
     full_name: str | None
+    avatar_url: str | None = None
     email_verified: bool
     workspaces: list[WorkspaceOut]

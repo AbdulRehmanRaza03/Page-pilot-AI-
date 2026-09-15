@@ -158,9 +158,18 @@ export function Sidebar() {
       {/* User */}
       <div className="border-t border-slate-200 p-3">
         <div className="flex items-center gap-3 rounded-lg px-2 py-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-purple-600 text-sm font-semibold text-white">
-            {initials}
-          </div>
+          {user?.avatar_url ? (
+            <img
+              src={user.avatar_url}
+              alt={name}
+              className="h-9 w-9 rounded-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-purple-600 text-sm font-semibold text-white">
+              {initials}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <p className="truncate text-sm font-medium text-navy">{name}</p>
             <p className="truncate text-xs capitalize text-slate-400">{role}</p>

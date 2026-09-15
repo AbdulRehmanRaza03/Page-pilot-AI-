@@ -55,6 +55,7 @@ async def me(
         id=user.id,
         email=user.email,
         full_name=user.full_name,
+        avatar_url=user.avatar_url,
         email_verified=user.email_verified_at is not None,
         workspaces=workspaces,
     )
@@ -91,6 +92,7 @@ async def google_callback(
         info = await google_oauth.get_userinfo(access)
         email = info.get("email")
         name = info.get("name")
+        picture = info.get("picture")
     except Exception as exc:
         log.exception("Google token exchange / userinfo failed: %s", exc)
         return RedirectResponse(
@@ -100,7 +102,7 @@ async def google_callback(
     from app.modules.auth.google_service import google_login
 
     try:
-        result = await google_login(db, email, name, None, None)
+        result = await google_login(db, email, name, None, None, picture)
     except Exception as exc:
         log.exception("Google login (find/create user) failed: %s", exc)
         return RedirectResponse(

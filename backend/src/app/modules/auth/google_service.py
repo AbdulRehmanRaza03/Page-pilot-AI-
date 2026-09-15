@@ -20,7 +20,7 @@ from app.schemas.auth import TokenResponse
 
 
 async def find_or_create_google_user(
-    db: AsyncSession, email: str, name: str | None
+    db: AsyncSession, email: str, name: str | None, picture: str | None = None
 ) -> User:
     """Return an existing user for this Google email, or create one."""
     normalized = email.lower()
@@ -33,6 +33,7 @@ async def find_or_create_google_user(
             email=normalized,
             password_hash=hash_password(secrets.token_urlsafe(32)),
             full_name=name,
+            avatar_url=picture,
             email_verified_at=None,  # set below
         )
         db.add(user)
@@ -64,10 +65,11 @@ async def find_or_create_google_user(
 
 
 async def google_login(
-    db: AsyncSession, email: str, name: str | None, ip: str | None, ua: str | None
+    db: AsyncSession, email: str, name: str | None, ip: str | None, ua: str | None,
+    picture: str | None = None,
 ) -> TokenResponse:
     """Authenticate (or register) via Google and return tokens."""
     if not email:
         raise UnauthorizedError("Google did not return an email")
-    user = await find_or_create_google_user(db, email, name)
+    user = await find_or_create_google_user(db, email, name, picture)
     return await _issue_tokens(db, user, ip, ua)
