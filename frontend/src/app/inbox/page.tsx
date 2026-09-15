@@ -16,6 +16,7 @@ import {
   Sparkles,
   MoreVertical,
   CheckCheck,
+  ArrowLeft,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Input } from "@/components/ui/input";
@@ -224,7 +225,10 @@ export default function InboxPage() {
     <AppShell title="Inbox" subtitle="Manage all your page conversations in one place">
       <div className="flex h-[calc(100vh-8rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">
         {/* Left: conversation list */}
-        <div className="flex w-full flex-col border-r border-slate-200 sm:w-80 lg:w-96">
+        <div className={cn(
+          "flex w-full flex-col border-r border-slate-200 sm:w-80 lg:w-96",
+          active && "hidden md:flex"
+        )}>
           <div className="border-b border-slate-200 p-4">
             <h2 className="text-base font-semibold text-navy">Conversations</h2>
             <div className="relative mt-3">
@@ -341,11 +345,22 @@ export default function InboxPage() {
         </div>
 
         {/* Middle: chat area */}
-        <div className="hidden flex-1 flex-col md:flex">
+        <div className={cn(
+          "flex-1 flex-col",
+          active ? "flex" : "hidden md:flex"
+        )}>
           {active ? (
             <>
               <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
                 <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setActiveId(null)}
+                    className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 md:hidden"
+                    aria-label="Back to conversations"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
                   <Avatar name={conversationName(active, contacts)} className="h-10 w-10" />
                   <div>
                     <div className="flex items-center gap-2">

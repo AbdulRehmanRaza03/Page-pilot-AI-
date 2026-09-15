@@ -62,6 +62,7 @@ export function Sidebar() {
   const router = useRouter();
   const { user, logout } = useAuthContext();
   const [unread, setUnread] = useState(0);
+  const [confirmLogout, setConfirmLogout] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -98,7 +99,8 @@ export function Sidebar() {
   const role = user?.workspaces?.find((w) => w.id)?.role ?? "Member";
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex">
+    <>
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex">
       {/* Logo */}
       <div className="flex h-16 items-center gap-2 border-b border-slate-200 px-5">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600">
@@ -167,7 +169,7 @@ export function Sidebar() {
         {/* Logout button (visible) */}
         <button
           type="button"
-          onClick={handleLogout}
+          onClick={() => setConfirmLogout(true)}
           className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
         >
           <LogOut className="h-4 w-4" />
@@ -175,5 +177,38 @@ export function Sidebar() {
         </button>
       </div>
     </aside>
+
+    {/* Logout confirmation modal */}
+    {confirmLogout && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div
+          className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+          onClick={() => setConfirmLogout(false)}
+        />
+        <div className="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+          <h3 className="text-lg font-semibold text-navy">Log out of PagePilot?</h3>
+          <p className="mt-1.5 text-sm text-slate-500">
+            You&apos;ll need to sign in again to access your workspace.
+          </p>
+          <div className="mt-5 flex gap-3">
+            <button
+              type="button"
+              onClick={() => setConfirmLogout(false)}
+              className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-navy transition-colors hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex-1 rounded-lg bg-danger px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-600"
+            >
+              Log out
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
