@@ -28,8 +28,14 @@ class ChatResponse(BaseModel):
 
 
 def _detect_intent(text: str) -> str | None:
-    """Simple, reliable intent detection for the read-only tools."""
+    """Simple, reliable intent detection for the tools.
+
+    External actions (send/broadcast) are checked FIRST so phrases like
+    "send to all leads" aren't misclassified as a lead-search.
+    """
     t = text.lower()
+    if any(k in t for k in ("campaign", "broadcast", "send to", "send all", "send my", "send a", "blast")):
+        return "send_campaign"
     if any(k in t for k in ("lead", "contact", "customer", "who asked", "find")):
         return "search_contacts"
     if any(k in t for k in ("analytics", "performance", "metric", "stat", "dashboard", "how many")):
@@ -38,8 +44,6 @@ def _detect_intent(text: str) -> str | None:
         return "get_conversations"
     if any(k in t for k in ("draft", "reply", "write a", "respond")):
         return "draft_reply"
-    if any(k in t for k in ("campaign", "broadcast", "send to", "send all", "send my", "blast")):
-        return "send_campaign"
     return None
 
 
