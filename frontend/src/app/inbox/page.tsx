@@ -498,7 +498,7 @@ export default function InboxPage() {
                   </div>
                   <Button
                     size="md"
-                    className="h-11 w-11 p-0"
+                    className="h-11 w-11 shrink-0 p-0"
                     loading={sending}
                     disabled={!draft.trim()}
                     onClick={handleSend}

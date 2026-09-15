@@ -200,18 +200,26 @@ export default function DashboardPage() {
             <CardTitle>Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <Button className="w-full justify-start" variant="outline">
-              <Plus className="h-4 w-4" /> Create Campaign
-            </Button>
-            <Button className="w-full justify-start" variant="outline">
-              <Workflow className="h-4 w-4" /> New Automation
-            </Button>
-            <Button className="w-full justify-start" variant="outline">
-              <UserPlus className="h-4 w-4" /> Add Contact
-            </Button>
-            <Button className="w-full justify-start" variant="outline">
-              <Globe className="h-4 w-4" /> Connect Page
-            </Button>
+            <Link href="/campaigns" className="w-full">
+              <Button className="w-full justify-start" variant="outline">
+                <Plus className="h-4 w-4" /> Create Campaign
+              </Button>
+            </Link>
+            <Link href="/automations" className="w-full">
+              <Button className="w-full justify-start" variant="outline">
+                <Workflow className="h-4 w-4" /> New Automation
+              </Button>
+            </Link>
+            <Link href="/contacts" className="w-full">
+              <Button className="w-full justify-start" variant="outline">
+                <UserPlus className="h-4 w-4" /> Add Contact
+              </Button>
+            </Link>
+            <Link href="/pages" className="w-full">
+              <Button className="w-full justify-start" variant="outline">
+                <Globe className="h-4 w-4" /> Connect Page
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </div>

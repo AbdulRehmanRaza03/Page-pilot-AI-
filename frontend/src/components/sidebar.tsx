@@ -103,9 +103,10 @@ export function Sidebar() {
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex">
       {/* Logo */}
       <div className="flex h-16 items-center gap-2 border-b border-slate-200 px-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600">
-          <svg viewBox="0 0 24 24" className="h-4 w-4 text-white" fill="currentColor">
-            <path d="M12 2 L20 12 L10 20 Z" />
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 shadow-sm">
+          <svg viewBox="0 0 24 24" className="h-5 w-5 text-white" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 11l18-8-3 18-6-4-4 4z" fill="currentColor" stroke="none" opacity="0.9" />
+            <path d="M15 13l-1.5 6.5-2.5-4" stroke="currentColor" fill="none" />
           </svg>
         </div>
         <div>

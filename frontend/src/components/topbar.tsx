@@ -1,13 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { Menu, X, Bell, Search, HelpCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Menu, X, Bell, Search, HelpCircle, LogOut } from "lucide-react";
+import { useAuthContext } from "@/components/auth-provider";
 
 function MobileSidebarNav({
   onClose,
 }: {
   onClose: () => void;
 }) {
+  const router = useRouter();
+  const { logout } = useAuthContext();
+
+  const handleLogout = () => {
+    logout();
+    router.replace("/login");
+  };
+
   // Import nav items lazily to avoid duplicating the full nav config.
   const navGroups = [
     {
@@ -48,9 +58,9 @@ function MobileSidebarNav({
     <div className="h-full overflow-y-auto bg-white px-4 py-5">
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600">
-            <svg viewBox="0 0 24 24" className="h-4 w-4 text-white" fill="currentColor">
-              <path d="M12 2 L20 12 L10 20 Z" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600">
+            <svg viewBox="0 0 24 24" className="h-5 w-5 text-white" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 11l18-8-3 18-6-4-4 4z" fill="currentColor" stroke="none" opacity="0.9" />
             </svg>
           </div>
           <span className="text-sm font-bold text-navy">PagePilot</span>
@@ -84,6 +94,16 @@ function MobileSidebarNav({
           </ul>
         </div>
       ))}
+
+      {/* Logout */}
+      <button
+        type="button"
+        onClick={handleLogout}
+        className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+      >
+        <LogOut className="h-4 w-4" />
+        Logout
+      </button>
     </div>
   );
 }
