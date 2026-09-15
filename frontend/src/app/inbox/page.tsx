@@ -166,7 +166,6 @@ export default function InboxPage() {
   async function handleSend() {
     const text = draft.trim();
     if (!activeId || !text || sending) return;
-    setSending(true);
     setDraft("");
 
     // Optimistic message: show it immediately so the UI feels instant even
@@ -184,6 +183,9 @@ export default function InboxPage() {
       created_at: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, optimistic]);
+    // Reset sending immediately so the user can type/send the next message
+    // right away; the actual send continues in the background.
+    setSending(false);
 
     try {
       const sent = await messagingApi.sendMessage(activeId, text);
@@ -194,8 +196,6 @@ export default function InboxPage() {
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
       setDraft(text);
       setMessagesError(err instanceof Error ? err.message : "Failed to send message");
-    } finally {
-      setSending(false);
     }
   }
 

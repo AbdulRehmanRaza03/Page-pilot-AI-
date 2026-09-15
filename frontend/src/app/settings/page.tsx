@@ -19,6 +19,7 @@ import { AppShell } from "@/components/app-shell";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuthContext } from "@/components/auth-provider";
 
 const navItems = [
   { label: "General", icon: Layout },
@@ -91,9 +92,11 @@ function Toggle({
 }
 
 export default function SettingsPage() {
+  const { user } = useAuthContext();
+  const workspace = user?.workspaces?.[0];
   const [active, setActive] = useState("General");
-  const [workspaceName, setWorkspaceName] = useState("Acme Inc.");
-  const [workspaceSlug, setWorkspaceSlug] = useState("acme-inc");
+  const [workspaceName, setWorkspaceName] = useState(workspace?.name ?? "");
+  const [workspaceSlug, setWorkspaceSlug] = useState(workspace?.slug ?? "");
   const [timezone, setTimezone] = useState("EST (UTC -5:00)");
   const [language, setLanguage] = useState("English (US)");
 

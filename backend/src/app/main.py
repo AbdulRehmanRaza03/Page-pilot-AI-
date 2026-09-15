@@ -20,7 +20,35 @@ async def lifespan(app: FastAPI):
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # Auto-add known missing columns (non-destructive) so a schema change in code
+    # is picked up automatically on the next deploy.
+    await _ensure_columns()
     yield
+
+
+async def _ensure_columns() -> None:
+    """Add known missing columns if the DB was created before they were added."""
+    from sqlalchemy import text
+
+    from app.core.db import engine
+
+    statements = [
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(1024) NULL",
+        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS page_id UUID NULL",
+        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS sent_count INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS total_count INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS recipient_limit INTEGER NULL",
+        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS gap_seconds INTEGER NOT NULL DEFAULT 5",
+    ]
+    try:
+        async with engine.begin() as conn:
+            for stmt in statements:
+                await conn.execute(text(stmt))
+    except Exception:  # noqa: BLE001
+        # Never fail startup because of a column check (e.g. SQLite without ALTER).
+        pass
 
 
 def create_app() -> FastAPI:
