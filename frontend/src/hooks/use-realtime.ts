@@ -15,17 +15,25 @@ export function useRealtime(onEvent?: (event: { type: string; data: any }) => vo
   onEventRef.current = onEvent;
 
   useEffect(() => {
+    // Only run in the browser and only if WebSocket is available.
+    if (typeof window === "undefined" || typeof WebSocket === "undefined") {
+      return;
+    }
+
     // Derive the ws:// URL from the http(s) API base (strip /api/v1).
     const base = API_URL.replace(/^https?/, (m) => (m === "https" ? "wss" : "ws")).replace(/\/api\/v1\/?$/, "");
     let ws: WebSocket | null = null;
-    let retry: ReturnType<typeof setTimeout>;
+    let retry: ReturnType<typeof setTimeout> | null = null;
+    let closed = false;
 
     const connect = () => {
+      if (closed) return;
       try {
         ws = new WebSocket(`${base}/ws`);
       } catch {
         return;
       }
+      if (!ws) return;
 
       ws.onmessage = (event) => {
         try {
@@ -40,8 +48,9 @@ export function useRealtime(onEvent?: (event: { type: string; data: any }) => vo
       };
 
       ws.onclose = () => {
-        // Reconnect after a short delay.
-        retry = setTimeout(connect, 5000);
+        if (!closed) {
+          retry = setTimeout(connect, 5000);
+        }
       };
 
       ws.onerror = () => {
@@ -52,7 +61,8 @@ export function useRealtime(onEvent?: (event: { type: string; data: any }) => vo
     connect();
 
     return () => {
-      clearTimeout(retry);
+      closed = true;
+      if (retry) clearTimeout(retry);
       ws?.close();
     };
   }, [notify]);

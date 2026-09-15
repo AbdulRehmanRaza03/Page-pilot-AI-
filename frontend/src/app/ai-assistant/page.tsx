@@ -79,7 +79,7 @@ export default function AiAssistantPage() {
                 <div className="max-w-[85%]">
                   <div className="rounded-2xl rounded-tl-md border border-slate-200 bg-white px-4 py-3 shadow-card">
                     <p className="whitespace-pre-wrap text-sm text-navy">{m.content}</p>
-                    {m.data?.contacts && (
+                    {m.data?.contacts && Array.isArray(m.data.contacts) && (
                       <div className="mt-3 border-t border-slate-100 pt-3">
                         <p className="mb-2 text-xs font-semibold text-slate-500">
                           {m.data.contacts.length} contact(s)

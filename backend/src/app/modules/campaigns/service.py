@@ -107,10 +107,9 @@ async def run_pending_send(
     Called by the worker/task. Sends one message at a time with a short delay.
     Returns a summary dict.
     """
-    from app.core.errors import MetaApiError
     from app.core.security import decrypt_secret
     from app.models import FacebookPage, PageToken
-    from app.services.meta_client import meta_client
+    from app.services.meta_client import MetaApiError, meta_client
 
     campaign = await db.get(Campaign, campaign_id)
     if campaign is None or campaign.workspace_id != workspace.id:

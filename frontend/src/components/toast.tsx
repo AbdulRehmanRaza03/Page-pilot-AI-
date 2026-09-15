@@ -60,8 +60,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+const noopNotify = { notify: () => {} };
+
 export function useToast() {
   const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error("useToast must be used within ToastProvider");
+  // Defensive: if no provider, no-op rather than crash.
+  if (!ctx) return noopNotify;
   return ctx;
 }
