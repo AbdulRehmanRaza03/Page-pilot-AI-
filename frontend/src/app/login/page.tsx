@@ -14,9 +14,9 @@ import { Button } from "@/components/ui/button";
 import { useAuthContext } from "@/components/auth-provider";
 import { authApi } from "@/lib/api/auth";
 
-function LogoMark({ dark = false }: { dark?: boolean }) {
+function LogoMark({ dark = false, className = "" }: { dark?: boolean; className?: string }) {
   return (
-    <div className="flex items-center gap-2.5">
+    <div className={`flex items-center gap-2.5 ${className}`}>
       <div
         className={`flex h-9 w-9 items-center justify-center rounded-xl ${
           dark ? "bg-white/10" : "bg-gradient-to-br from-blue-500 to-indigo-600"
