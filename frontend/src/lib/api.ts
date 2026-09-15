@@ -75,11 +75,20 @@ export async function apiFetch<T>(
   }
 
   if (!res.ok) {
-    let body: ApiErrorBody = { code: "unknown", message: res.statusText };
+    let body: ApiErrorBody = { code: "error", message: "Something went wrong." };
     try {
-      body = await res.json();
+      const data = await res.json();
+      // Handle FastAPI's default {"detail": ...} as well as our {"message": ...} envelope.
+      if (typeof data === "object" && data !== null) {
+        const msg = (data as any).message ?? (data as any).detail;
+        if (typeof msg === "string") {
+          body = { code: (data as any).code ?? "error", message: msg };
+        } else {
+          body = { code: "error", message: "Something went wrong. Please try again." };
+        }
+      }
     } catch {
-      /* non-JSON error body */
+      /* non-JSON error body — fall through to default */
     }
     throw new ApiError(res.status, body);
   }
