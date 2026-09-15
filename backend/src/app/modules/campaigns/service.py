@@ -16,7 +16,7 @@ import asyncio
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Campaign, CampaignRecipient, Contact, Workspace
@@ -204,6 +204,50 @@ async def run_pending_send(
     await db.refresh(campaign)
 
     return {"sent": sent, "skipped": skipped, "failed": failed}
+
+
+async def get_campaign_recipients(
+    db: AsyncSession, workspace: Workspace, campaign_id: uuid.UUID
+) -> list[dict]:
+    """Return per-recipient delivery status (sent/failed + error) for a campaign."""
+    result = await db.execute(
+        select(CampaignRecipient, Contact)
+        .join(Contact, Contact.id == CampaignRecipient.contact_id)
+        .where(CampaignRecipient.campaign_id == campaign_id)
+        .order_by(CampaignRecipient.created_at.asc())
+    )
+    out: list[dict] = []
+    for recipient, contact in result.all():
+        out.append(
+            {
+                "id": str(recipient.id),
+                "contact_id": str(contact.id),
+                "name": contact.name or contact.psid,
+                "status": recipient.status,
+                "error": recipient.error,
+                "sent_at": recipient.sent_at.isoformat() if recipient.sent_at else None,
+            }
+        )
+    return out
+
+
+async def get_campaign_stats(
+    db: AsyncSession, workspace: Workspace, campaign_id: uuid.UUID
+) -> dict:
+    """Return aggregate delivery stats for a campaign."""
+    result = await db.execute(
+        select(
+            CampaignRecipient.status,
+            func.count(CampaignRecipient.id),
+        )
+        .where(CampaignRecipient.campaign_id == campaign_id)
+        .group_by(CampaignRecipient.status)
+    )
+    stats = {"sent": 0, "failed": 0, "pending": 0}
+    for status, count in result.all():
+        key = status if status in stats else "pending"
+        stats[key] = count
+    return stats
 
 
 async def _persist_outbound_message(

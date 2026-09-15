@@ -86,6 +86,23 @@ def create_app() -> FastAPI:
         except Exception as exc:  # noqa: BLE001
             return {"status": "not_ready", "db": str(exc)}
 
+    # WebSocket endpoint for real-time inbox/notification updates.
+    from fastapi import WebSocket, WebSocketDisconnect
+
+    from app.services.realtime import manager
+
+    @app.websocket("/ws")
+    async def websocket_endpoint(ws: WebSocket) -> None:
+        await manager.connect(ws)
+        try:
+            while True:
+                # Keep the connection alive; we mostly push events out.
+                await ws.receive_text()
+        except WebSocketDisconnect:
+            manager.disconnect(ws)
+        except Exception:  # noqa: BLE001
+            manager.disconnect(ws)
+
     # Routers
     from app.modules.ai.router import router as ai_router
     from app.modules.analytics.router import router as analytics_router

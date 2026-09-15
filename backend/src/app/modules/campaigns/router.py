@@ -97,6 +97,24 @@ async def send_campaign(
     return {"started": True}
 
 
+@router.get("/{campaign_id}/recipients")
+async def campaign_recipients(
+    campaign_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    workspace: Annotated[Workspace, Depends(get_workspace)],
+) -> list[dict]:
+    return await service.get_campaign_recipients(db, workspace, campaign_id)
+
+
+@router.get("/{campaign_id}/stats")
+async def campaign_stats(
+    campaign_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    workspace: Annotated[Workspace, Depends(get_workspace)],
+) -> dict:
+    return await service.get_campaign_stats(db, workspace, campaign_id)
+
+
 @router.delete("/{campaign_id}", status_code=204)
 async def delete_campaign(
     campaign_id: uuid.UUID,

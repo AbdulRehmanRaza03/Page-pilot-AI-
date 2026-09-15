@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import {
@@ -21,6 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuthContext } from "@/components/auth-provider";
 import { analyticsApi } from "@/lib/api/messaging";
+import { useToast } from "@/components/toast";
 
 const navGroups = [
   {
@@ -61,8 +62,10 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuthContext();
+  const { notify } = useToast();
   const [unread, setUnread] = useState(0);
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const prevUnreadRef = useRef(0);
 
   const handleLogout = () => {
     logout();
@@ -77,7 +80,18 @@ export function Sidebar() {
       analyticsApi
         .dashboard()
         .then((d) => {
-          if (active) setUnread(d.unread_conversations ?? 0);
+          if (!active) return;
+          const next = d.unread_conversations ?? 0;
+          // Show a toast when new unread messages arrive.
+          if (next > prevUnreadRef.current) {
+            const diff = next - prevUnreadRef.current;
+            notify(
+              "New message",
+              diff === 1 ? "You have 1 new unread message." : `You have ${diff} new unread messages.`
+            );
+          }
+          prevUnreadRef.current = next;
+          setUnread(next);
         })
         .catch(() => {});
     };
@@ -87,7 +101,7 @@ export function Sidebar() {
       active = false;
       clearInterval(interval);
     };
-  }, []);
+  }, [notify]);
 
   const name = user?.full_name || user?.email?.split("@")[0] || "User";
   const initials = name

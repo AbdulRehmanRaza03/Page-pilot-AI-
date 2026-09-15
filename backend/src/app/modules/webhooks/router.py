@@ -134,6 +134,19 @@ async def receive_webhook(
                     text=msg.get("text"),
                 )
 
+                # Push a real-time event to connected browsers.
+                from app.services.realtime import broadcast_event
+
+                await broadcast_event(
+                    "new_message",
+                    {
+                        "workspace_id": str(workspace_id),
+                        "page_id": str(page_id_fk),
+                        "sender_psid": str(sender_psid),
+                        "text": msg.get("text"),
+                    },
+                )
+
     # Always acknowledge quickly (200) to avoid Meta retries.
     return {"received": True}
 
