@@ -11,6 +11,7 @@ from app.models import Workspace
 from app.modules.ai import tools
 from app.modules.ai.provider import get_provider
 from app.modules.auth.deps import get_workspace
+from app.schemas.campaigns import CampaignCreate
 
 router = APIRouter(tags=["ai"])
 
@@ -37,6 +38,8 @@ def _detect_intent(text: str) -> str | None:
         return "get_conversations"
     if any(k in t for k in ("draft", "reply", "write a", "respond")):
         return "draft_reply"
+    if any(k in t for k in ("campaign", "broadcast", "send to", "send all", "send my", "blast")):
+        return "send_campaign"
     return None
 
 
@@ -86,6 +89,16 @@ async def chat(
         tool_name = "draft_reply"
         tool_data = None
         context_context = None
+    elif intent == "send_campaign":
+        tool_name = "send_campaign"
+        # Extract a simple message from the user's request (heuristic).
+        message = _extract_campaign_message(body.message)
+        tool_data = await tools.prepare_campaign(db, workspace, message)
+        context_context = (
+            f"The user wants to send a campaign to {tool_data['audience']} contacts "
+            f"with the message: \"{message}\". This is an external action that "
+            "requires explicit confirmation before sending."
+        )
 
     reply = await provider.chat(messages, context=context_context)
     return ChatResponse(reply=reply, tool=tool_name, data=tool_data)
@@ -103,4 +116,68 @@ def _contacts_to_text(data: dict) -> str:
     return (
         f"Found {data.get('count', 0)} contacts/leads. Top results:\n"
         + "\n".join(lines)
+    )
+
+
+def _extract_campaign_message(text: str) -> str:
+    """Heuristically pull a campaign message out of the user's request.
+
+    Extracts text inside the outermost quotes, otherwise falls back to the
+    whole request stripped of common lead-in phrases.
+    """
+    import re
+
+    m = re.search(r'["\'](.+?)["\']', text)
+    if m:
+        return m.group(1).strip()
+    # Fallback: strip lead-in phrases and use the remainder.
+    for phrase in (
+        "send to all", "send all", "send my", "send a campaign", "broadcast",
+        "send", "to all leads", "all leads",
+    ):
+        text = text.replace(phrase, "")
+    cleaned = text.strip(" :-")
+    return cleaned or "Thanks for reaching out!"
+
+
+class ConfirmRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=2000)
+
+
+class ConfirmResponse(BaseModel):
+    sent: int
+    skipped: int
+    failed: int
+
+
+@router.post("/confirm-send", response_model=ConfirmResponse)
+async def confirm_send(
+    body: ConfirmRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    workspace: Annotated[Workspace, Depends(get_workspace)],
+) -> ConfirmResponse:
+    """Execute a broadcast campaign after the user has explicitly confirmed.
+
+    This is the only place the AI assistant can trigger an actual external
+    send, and it always requires a direct user confirmation call.
+    """
+    from app.modules.campaigns import service as campaign_service
+
+    # Use the workspace owner as the campaign author.
+    owner_id = workspace.owner_id
+    data = CampaignCreate(
+        name="AI Broadcast",
+        message=body.message,
+        page_id=None,
+        audience_filter=None,
+        schedule_at=None,
+        recipient_limit=None,
+        gap_seconds=5,
+    )
+    campaign = await campaign_service.create_campaign(db, workspace, data, owner_id)
+    summary = await campaign_service.run_pending_send(db, workspace, campaign.id)
+    return ConfirmResponse(
+        sent=summary.get("sent", 0),
+        skipped=summary.get("skipped", 0),
+        failed=summary.get("failed", 0),
     )

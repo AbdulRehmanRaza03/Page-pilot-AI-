@@ -16,4 +16,9 @@ export type AIChatMessage = {
 export const aiApi = {
   chat: (message: string, history: AIChatMessage[] = []) =>
     api.post<ChatReply>("/ai/chat", { message, history }),
+  confirmSend: (message: string) =>
+    api.post<{ sent: number; skipped: number; failed: number }>(
+      "/ai/confirm-send",
+      { message }
+    ),
 };

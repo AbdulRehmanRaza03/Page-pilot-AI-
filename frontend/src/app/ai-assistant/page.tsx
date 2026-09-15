@@ -65,6 +65,26 @@ export default function AiAssistantPage() {
     }
   };
 
+  const [confirming, setConfirming] = useState(false);
+
+  const handleConfirmSend = async (message: string) => {
+    setConfirming(true);
+    try {
+      const res = await aiApi.confirmSend(message);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `${res.sent} sent, ${res.failed} failed, ${res.skipped} skipped.`,
+        },
+      ]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send campaign");
+    } finally {
+      setConfirming(false);
+    }
+  };
+
   return (
     <AppShell title="PagePilot AI" subtitle="Your intelligent business assistant.">
       <div className="mx-auto flex max-w-3xl flex-col" style={{ height: "calc(100vh - 160px)" }}>
@@ -94,6 +114,30 @@ export default function AiAssistantPage() {
                             </li>
                           ))}
                         </ul>
+                      </div>
+                    )}
+                    {m.tool === "send_campaign" && m.data?.audience !== undefined && (
+                      <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                        <p className="text-xs font-semibold text-amber-800">Confirm campaign send</p>
+                        <p className="mt-1 text-xs text-amber-700">
+                          {m.data.audience} contact(s) will receive this message.
+                        </p>
+                        <p className="mt-1 line-clamp-2 text-xs text-amber-700">
+                          &quot;{m.data.message}&quot;
+                        </p>
+                        <div className="mt-3 flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleConfirmSend(m.data.message)}
+                            loading={confirming}
+                            disabled={confirming}
+                          >
+                            Confirm &amp; Send
+                          </Button>
+                          <Button size="sm" variant="outline">
+                            Cancel
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>

@@ -1,18 +1,19 @@
-"""AI assistant tools: real, read-only actions backed by the database.
+"""AI assistant tools: real actions backed by the database.
 
-These tools let the AI assistant do actual work (not just chat):
+Read-only tools:
   - search_contacts   -> list/filter contacts/leads
   - analytics         -> dashboard metrics
   - get_conversation  -> latest conversations + unread
   - draft_reply       -> a suggested reply (uses the LLM)
 
-All tools are read-only and workspace-scoped. External actions (send/campaign)
-are intentionally NOT included here and require a separate confirmation model.
+External tools (require confirmation before execution):
+  - prepare_campaign  -> preview audience + message (no send)
+  - execute_campaign  -> actually send (called only after user confirms)
 """
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Contact, Conversation, Workspace
@@ -71,3 +72,21 @@ async def get_conversations(db: AsyncSession, workspace: Workspace) -> dict:
     ]
     unread = sum(c.unread_count for c in conversations)
     return {"conversations": rows, "count": len(rows), "unread": unread}
+
+
+async def prepare_campaign(
+    db: AsyncSession, workspace: Workspace, message: str
+) -> dict:
+    """Preview a campaign: audience count + message preview. Does NOT send."""
+    result = await db.execute(
+        select(func.count())
+        .select_from(Contact)
+        .where(Contact.workspace_id == workspace.id, Contact.deleted_at.is_(None))
+    )
+    count = result.scalar() or 0
+    return {
+        "action": "send_campaign",
+        "message": message,
+        "audience": count,
+        "page": None,  # resolved at execution time
+    }
