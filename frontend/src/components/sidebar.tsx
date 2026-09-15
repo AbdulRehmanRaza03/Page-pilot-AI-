@@ -162,16 +162,17 @@ export function Sidebar() {
             <p className="truncate text-sm font-medium text-navy">{name}</p>
             <p className="truncate text-xs capitalize text-slate-400">{role}</p>
           </div>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
-            aria-label="Logout"
-            title="Logout"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
         </div>
+
+        {/* Logout button (visible) */}
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+        >
+          <LogOut className="h-4 w-4" />
+          Logout
+        </button>
       </div>
     </aside>
   );
